@@ -11,7 +11,7 @@ export interface CheckResult {
 
 export async function checkMonitor(monitor: MonitorConfig): Promise<CheckResult> {
   const controller = new AbortController()
-  const timeoutMs = monitor.timeout
+  const timeoutMs = monitor.timeout ?? 30000
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
   const start = performance.now()
