@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  upupup:
+    build: .
+    container_name: upupup
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    restart: unless-stopped
