@@ -106,17 +106,28 @@ export async function checkMonitor(monitor: MonitorConfig): Promise<CheckResult>
 }
 
 export async function checkAndSave(monitor: MonitorConfig) {
-  const result = await checkMonitor(monitor)
-  const now = new Date().toISOString()
-  insertCheckRecord({
-    name: monitor.name,
-    url: monitor.url,
-    status: result.status,
-    latency_ms: result.latency_ms,
-    status_code: result.status_code,
-    keyword_ok: result.keyword_ok,
-    error: result.error,
-    checked_at: now,
-  })
-  console.log(`[check] ${monitor.name} ${result.status} ${result.latency_ms}ms`)
+  try {
+    const result = await checkMonitor(monitor)
+    const now = new Date().toISOString()
+
+    try {
+      insertCheckRecord({
+        name: monitor.name,
+        url: monitor.url,
+        status: result.status,
+        latency_ms: result.latency_ms,
+        status_code: result.status_code,
+        keyword_ok: result.keyword_ok,
+        error: result.error,
+        checked_at: now,
+      })
+      console.log(`[check] ✅ ${monitor.name} ${result.status} ${result.latency_ms}ms`)
+    } catch (dbError) {
+      console.error(`[check] ❌ ${monitor.name} 数据库写入失败:`, dbError)
+      throw dbError
+    }
+  } catch (error) {
+    console.error(`[check] ❌ ${monitor.name} 检测流程异常:`, error)
+    throw error
+  }
 }

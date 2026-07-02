@@ -56,11 +56,20 @@ function aggregateRecords(
 ): HistoryPoint[] {
   const startTime = new Date(now.getTime() - rangeMs)
 
+  console.log(`[dashboard] 聚合记录: startTime=${startTime.toISOString()}, now=${now.toISOString()}, records=${records.length}`)
+
   // 过滤时间范围内的记录
   const filteredRecords = records.filter(r => {
-    const recordTime = new Date(r.checked_at)
-    return recordTime >= startTime && recordTime <= now
+    try {
+      const recordTime = new Date(r.checked_at)
+      return recordTime >= startTime && recordTime <= now
+    } catch (e) {
+      console.warn(`[dashboard] 日期解析失败:`, r.checked_at, e)
+      return false
+    }
   })
+
+  console.log(`[dashboard] 过滤后记录: ${filteredRecords.length} 条`)
 
   // 按粒度聚合
   const points: HistoryPoint[] = []
@@ -70,14 +79,19 @@ function aggregateRecords(
     // 找到这个时间粒度内最新的一条记录
     const endTime = new Date(currentTime.getTime() + granularityMs)
 
-    const recordInRange = filteredRecords.find(r => {
-      const recordTime = new Date(r.checked_at)
-      return recordTime >= currentTime && recordTime < endTime
-    })
+    let recordInRange: CheckRecord | undefined
+    try {
+      recordInRange = filteredRecords.find(r => {
+        const recordTime = new Date(r.checked_at)
+        return recordTime >= currentTime && recordTime < endTime
+      })
+    } catch (e) {
+      console.warn(`[dashboard] 查找记录时出错:`, e)
+    }
 
     points.push({
       time: currentTime.toISOString(),
-      status: recordInRange ? recordInRange.status as "up" | "down" : null,
+      status: recordInRange ? (recordInRange.status as "up" | "down") : null,
       latency_ms: recordInRange ? recordInRange.latency_ms : null,
       status_code: recordInRange ? recordInRange.status_code : null,
       error: recordInRange ? recordInRange.error : null,
@@ -86,59 +100,108 @@ function aggregateRecords(
     currentTime = endTime
   }
 
+  console.log(`[dashboard] 生成 ${points.length} 个时间点`)
   return points
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const requestedRanges = searchParams.getAll('range')
+  console.log(`[dashboard] 收到请求: ${request.url}`)
 
-  const db = getDb()
-  const monitors = getMonitorsFromEnv()
-  const now = new Date()
+  try {
+    const { searchParams } = new URL(request.url)
+    const requestedRanges = searchParams.getAll('range')
 
-  const result: DashboardResponse = {
-    monitors: [],
-    updated_at: now.toISOString(),
-    time_ranges: TIME_RANGES,
-  }
+    const db = getDb()
+    const monitors = getMonitorsFromEnv()
+    const now = new Date()
 
-  // 确定需要聚合哪些时间范围 - 默认返回所有范围
-  const rangesToAggregate = requestedRanges.length > 0
-    ? TIME_RANGES.filter(r => requestedRanges.includes(r.id))
-    : TIME_RANGES // 默认返回所有
+    console.log(`[dashboard] 处理 ${monitors.length} 个监控目标`)
 
-  for (const monitor of monitors) {
-    const allRecords = db
-      .prepare("SELECT * FROM check_history WHERE name = ? ORDER BY checked_at DESC")
-      .all(monitor.name) as CheckRecord[]
-
-    const latest = allRecords[0]
-    const records24h = allRecords.filter(
-      (r) => new Date(r.checked_at) > new Date(now.getTime() - 24 * 60 * 60 * 1000)
-    )
-    const records7d = allRecords.filter(
-      (r) => new Date(r.checked_at) > new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    )
-
-    // 聚合各种时间范围的数据
-    const history_points: { [key: string]: HistoryPoint[] } = {}
-    for (const range of rangesToAggregate) {
-      history_points[range.id] = aggregateRecords(allRecords, range.rangeMs, range.granularityMs, now)
+    const result: DashboardResponse = {
+      monitors: [],
+      updated_at: now.toISOString(),
+      time_ranges: TIME_RANGES,
     }
 
-    result.monitors.push({
-      name: monitor.name,
-      url: monitor.url,
-      status: latest?.status || "down",
-      latency_ms: latest?.latency_ms || null,
-      uptime_24h: calculateUptime(records24h),
-      uptime_7d: calculateUptime(records7d),
-      last_checked: latest?.checked_at || "",
-      last_error: latest?.error || null,
-      history_points,
-    })
-  }
+    // 确定需要聚合哪些时间范围 - 默认返回所有范围
+    const rangesToAggregate = requestedRanges.length > 0
+      ? TIME_RANGES.filter(r => requestedRanges.includes(r.id))
+      : TIME_RANGES // 默认返回所有
 
-  return NextResponse.json(result)
+    for (const monitor of monitors) {
+      try {
+        console.log(`[dashboard] 处理监控: ${monitor.name}`)
+
+        let allRecords: CheckRecord[] = []
+        try {
+          allRecords = db
+            .prepare("SELECT * FROM check_history WHERE name = ? ORDER BY checked_at DESC")
+            .all(monitor.name) as CheckRecord[]
+          console.log(`[dashboard] ${monitor.name}: 找到 ${allRecords.length} 条记录`)
+        } catch (dbError) {
+          console.error(`[dashboard] ${monitor.name} 数据库查询失败:`, dbError)
+        }
+
+        const latest = allRecords[0]
+        console.log(`[dashboard] ${monitor.name}: latest=`, latest ? { status: latest.status, time: latest.checked_at } : 'none')
+
+        const records24h = allRecords.filter(
+          (r) => {
+            try {
+              return new Date(r.checked_at) > new Date(now.getTime() - 24 * 60 * 60 * 1000)
+            } catch (e) {
+              return false
+            }
+          }
+        )
+        const records7d = allRecords.filter(
+          (r) => {
+            try {
+              return new Date(r.checked_at) > new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+            } catch (e) {
+              return false
+            }
+          }
+        )
+
+        // 聚合各种时间范围的数据
+        const history_points: { [key: string]: HistoryPoint[] } = {}
+        for (const range of rangesToAggregate) {
+          history_points[range.id] = aggregateRecords(allRecords, range.rangeMs, range.granularityMs, now)
+        }
+
+        result.monitors.push({
+          name: monitor.name,
+          url: monitor.url,
+          status: latest?.status || "down",
+          latency_ms: latest?.latency_ms || null,
+          uptime_24h: calculateUptime(records24h),
+          uptime_7d: calculateUptime(records7d),
+          last_checked: latest?.checked_at || "",
+          last_error: latest?.error || null,
+          history_points,
+        })
+      } catch (monitorError) {
+        console.error(`[dashboard] 处理监控 ${monitor.name} 失败:`, monitorError)
+        // 即使失败也添加一个占位记录，避免整个页面崩溃
+        result.monitors.push({
+          name: monitor.name,
+          url: monitor.url,
+          status: "down",
+          latency_ms: null,
+          uptime_24h: 0,
+          uptime_7d: 0,
+          last_checked: "",
+          last_error: `数据加载失败: ${monitorError}`,
+          history_points: {},
+        })
+      }
+    }
+
+    console.log(`[dashboard] 请求完成，返回 ${result.monitors.length} 个监控`)
+    return NextResponse.json(result)
+  } catch (error) {
+    console.error(`[dashboard] 请求异常:`, error)
+    return NextResponse.json({ error: String(error) }, { status: 500 })
+  }
 }

@@ -18,8 +18,39 @@ export function startCron() {
 
   const doCheck = async () => {
     console.log(`[cron] 开始检测... ${formatDate(new Date())}`)
-    await Promise.allSettled(monitors.map(checkAndSave))
-    cleanOldHistory(retentionDays)
+    
+    try {
+      const results = await Promise.allSettled(
+        monitors.map(async (monitor) => {
+          try {
+            await checkAndSave(monitor)
+            console.log(`[cron] ✅ ${monitor.name} 检测成功`)
+          } catch (error) {
+            console.error(`[cron] ❌ ${monitor.name} 检测失败:`, error)
+            throw error
+          }
+        })
+      )
+      
+      // 统计执行结果
+      const successCount = results.filter(r => r.status === 'fulfilled').length
+      const failCount = results.filter(r => r.status === 'rejected').length
+      console.log(`[cron] 检测结果: 成功 ${successCount}, 失败 ${failCount}`)
+      
+      if (failCount > 0) {
+        console.error(`[cron] 失败详情:`, results)
+      }
+      
+      try {
+        cleanOldHistory(retentionDays)
+      } catch (cleanError) {
+        console.error(`[cron] 清理旧记录失败:`, cleanError)
+      }
+      
+    } catch (error) {
+      console.error(`[cron] 检测流程异常:`, error)
+    }
+    
     console.log(`[cron] 检测完成 ${formatDate(new Date())}`)
   }
 
