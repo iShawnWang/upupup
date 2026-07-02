@@ -82,7 +82,7 @@ export function DashboardView({ initialData }: { initialData: DashboardResponse 
       <header className="flex flex-col gap-4 rounded-3xl border bg-white/30 p-4 backdrop-blur-sm dark:bg-black/10 sm:p-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-border/40 bg-background/60 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
-            <Activity className="h-3.5 w-3.5 text-primary" />
+            <Activity className="h-3.5 w-3.5 text-emerald-500" />
             网站 / API 可用性监控
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-5xl">
@@ -123,7 +123,7 @@ export function DashboardView({ initialData }: { initialData: DashboardResponse 
                 onClick={() => setSelectedRangeId(range.id)}
                 className={
                   selectedRangeId === range.id
-                    ? "text-xs h-7 px-3 py-1 bg-primary text-primary-foreground"
+                    ? "text-xs h-7 px-3 py-1 bg-emerald-500 text-white hover:bg-emerald-600"
                     : "text-xs h-7 px-3 py-1 text-muted-foreground hover:text-foreground"
                 }
               >
