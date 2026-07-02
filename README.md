@@ -94,7 +94,7 @@ DB_PATH=./data/monitor.db
 pnpm dev
 ```
 
-访问 http://localhost:3000 即可查看面板！
+访问 http://localhost:3001 即可查看面板！
 
 ---
 
@@ -118,6 +118,7 @@ pnpm dev
 | CHECK_INTERVAL_SECONDS | 60 | 检测间隔，最小 30 秒 |
 | HISTORY_RETENTION_DAYS | 90 | 历史数据保留天数 |
 | DB_PATH | ./data/monitor.db | SQLite 数据库文件路径 |
+| PORT | 3001 | 服务监听端口 |
 
 ---
 
@@ -134,6 +135,8 @@ pnpm build
 ```bash
 pm2 start ecosystem.config.js
 ```
+
+访问 http://localhost:3001 即可查看面板！
 
 #### 3. 查看状态和日志
 ```bash
@@ -162,7 +165,7 @@ docker build -t upupup .
 
 docker run -d \
   --name upupup \
-  -p 3000:3000 \
+  -p 3001:3001 \
   -v $(pwd)/data:/app/data \
   -v $(pwd)/.env:/app/.env:ro \
   --restart unless-stopped \
