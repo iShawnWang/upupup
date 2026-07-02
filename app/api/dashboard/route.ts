@@ -54,15 +54,24 @@ function aggregateRecords(
   granularityMs: number,
   now: Date
 ): HistoryPoint[] {
-  const startTime = new Date(now.getTime() - rangeMs)
+  // 对齐时间到整粒度
+  function alignToGranularity(date: Date, granularity: number): Date {
+    const timestamp = date.getTime()
+    const aligned = Math.floor(timestamp / granularity) * granularity
+    return new Date(aligned)
+  }
 
-  console.log(`[dashboard] 聚合记录: startTime=${startTime.toISOString()}, now=${now.toISOString()}, records=${records.length}, granularity=${granularityMs}ms`)
+  const nowAligned = alignToGranularity(now, granularityMs)
+  const startTime = new Date(nowAligned.getTime() - rangeMs)
+  const startTimeAligned = alignToGranularity(startTime, granularityMs)
+
+  console.log(`[dashboard] 聚合记录: startTime=${startTimeAligned.toISOString()}, now=${nowAligned.toISOString()}, records=${records.length}, granularity=${granularityMs}ms`)
 
   // 过滤时间范围内的记录
   const filteredRecords = records.filter(r => {
     try {
       const recordTime = new Date(r.checked_at)
-      return recordTime >= startTime && recordTime <= now
+      return recordTime >= startTimeAligned && recordTime <= nowAligned
     } catch (e) {
       console.warn(`[dashboard] 日期解析失败:`, r.checked_at, e)
       return false
@@ -74,8 +83,8 @@ function aggregateRecords(
   // 按粒度聚合
   const points: HistoryPoint[] = []
 
-  let currentTime = new Date(startTime)
-  while (currentTime < now) {
+  let currentTime = new Date(startTimeAligned)
+  while (currentTime < nowAligned) {
     // 找到这个时间粒度内的所有记录
     const endTime = new Date(currentTime.getTime() + granularityMs)
 
