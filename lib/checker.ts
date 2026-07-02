@@ -37,12 +37,49 @@ export async function checkMonitor(monitor: MonitorConfig): Promise<CheckResult>
     const statusOk = status_code === monitor.expectedStatus
     const keywordCheckOk = monitor.keyword ? keyword_ok === 1 : true
 
+    let errorMessage: string | null = null
+
+    if (!statusOk || !keywordCheckOk) {
+      const errorParts: string[] = []
+
+      if (!statusOk) {
+        errorParts.push(`状态码：期望 ${monitor.expectedStatus}，实际 ${status_code}`)
+      }
+
+      if (!keywordCheckOk && monitor.keyword) {
+        errorParts.push(`关键词：未找到 "${monitor.keyword}"`)
+      }
+
+      errorParts.push(`请求：${monitor.method} ${monitor.url}`)
+      errorParts.push(`超时：${timeoutMs}ms`)
+
+      errorParts.push(`--- 响应头 ---`)
+      res.headers.forEach((value, name) => {
+        errorParts.push(`${name}: ${value}`)
+      })
+
+      if (!body && !monitor.keyword) {
+        try {
+          body = await res.text()
+        } catch {
+          body = '(无法读取响应体)'
+        }
+      }
+
+      if (body) {
+        errorParts.push(`--- 响应体 ---`)
+        errorParts.push(body)
+      }
+
+      errorMessage = errorParts.join('\n')
+    }
+
     return {
       status: statusOk && keywordCheckOk ? "up" : "down",
       latency_ms,
       status_code,
       keyword_ok,
-      error: null,
+      error: errorMessage,
     }
   } catch (e) {
     // 检查是否是超时错误

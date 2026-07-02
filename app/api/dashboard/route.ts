@@ -28,6 +28,7 @@ export interface MonitorData {
   uptime_24h: number
   uptime_7d: number
   last_checked: string
+  last_error: string | null
   // 预聚合的各种时间范围数据（按需加载）
   history_points: {
     [rangeId: string]: HistoryPoint[]
@@ -134,6 +135,7 @@ export async function GET(request: NextRequest) {
       uptime_24h: calculateUptime(records24h),
       uptime_7d: calculateUptime(records7d),
       last_checked: latest?.checked_at || "",
+      last_error: latest?.error || null,
       history_points,
     })
   }

@@ -96,6 +96,16 @@ export function StatusCard({ monitor, time_ranges = [], selectedRangeId }: Statu
               </div>
             </div>
           </div>
+          {!isUp && monitor.last_error && (
+            <div className="mt-4 rounded-xl bg-red-500/10 border border-red-500/20 p-3">
+              <div className="flex items-center gap-2 text-red-500 text-[10px] font-semibold uppercase tracking-wider mb-2">
+                最近错误
+              </div>
+              <pre className="text-red-400 text-[11px] whitespace-pre-wrap break-all font-mono leading-relaxed">
+                {monitor.last_error}
+              </pre>
+            </div>
+          )}
         </div>
       </div>
 

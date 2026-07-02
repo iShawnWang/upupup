@@ -46,7 +46,7 @@ export function HistoryGrid({ history_points, time_ranges = [], selectedRangeId 
             </HoverCardTrigger>
             <HoverCardContent
               side="top"
-              className="w-64 space-y-2 rounded-xl border-border/50 bg-background/95 p-3 shadow-xl backdrop-blur-xl"
+              className="w-96 space-y-2 rounded-xl border-border/50 bg-background/95 p-3 shadow-xl backdrop-blur-xl"
             >
               <div className="flex items-center justify-between border-b border-border/50 pb-2">
                 <Badge variant="outline" className="h-5 px-1.5 text-[10px]">
@@ -79,9 +79,9 @@ export function HistoryGrid({ history_points, time_ranges = [], selectedRangeId 
                     {point.error && (
                       <div className="pt-1">
                         <span className="text-muted-foreground text-[10px]">错误</span>
-                        <p className="text-red-500 text-[10px] break-all mt-1">
+                        <pre className="text-red-400 text-[11px] whitespace-pre-wrap break-all mt-1 font-mono leading-relaxed">
                           {point.error}
-                        </p>
+                        </pre>
                       </div>
                     )}
                   </>
