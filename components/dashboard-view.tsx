@@ -125,11 +125,7 @@ export function DashboardView({ initialData }: { initialData: DashboardResponse 
                 variant={selectedRangeId === range.id ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setSelectedRangeId(range.id)}
-                className={
-                  selectedRangeId === range.id
-                    ? "text-xs h-7 px-3 py-1 bg-emerald-500 text-white hover:bg-emerald-600"
-                    : "text-xs h-7 px-3 py-1 text-muted-foreground hover:text-foreground"
-                }
+                className="text-xs h-7 px-3 py-1"
               >
                 {range.label}
               </Button>
