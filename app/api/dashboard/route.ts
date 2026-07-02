@@ -56,7 +56,7 @@ function aggregateRecords(
 ): HistoryPoint[] {
   const startTime = new Date(now.getTime() - rangeMs)
 
-  console.log(`[dashboard] 聚合记录: startTime=${startTime.toISOString()}, now=${now.toISOString()}, records=${records.length}`)
+  console.log(`[dashboard] 聚合记录: startTime=${startTime.toISOString()}, now=${now.toISOString()}, records=${records.length}, granularity=${granularityMs}ms`)
 
   // 过滤时间范围内的记录
   const filteredRecords = records.filter(r => {
@@ -76,12 +76,12 @@ function aggregateRecords(
 
   let currentTime = new Date(startTime)
   while (currentTime < now) {
-    // 找到这个时间粒度内最新的一条记录
+    // 找到这个时间粒度内的所有记录
     const endTime = new Date(currentTime.getTime() + granularityMs)
 
-    let recordInRange: CheckRecord | undefined
+    let recordsInRange: CheckRecord[] = []
     try {
-      recordInRange = filteredRecords.find(r => {
+      recordsInRange = filteredRecords.filter(r => {
         const recordTime = new Date(r.checked_at)
         return recordTime >= currentTime && recordTime < endTime
       })
@@ -89,13 +89,33 @@ function aggregateRecords(
       console.warn(`[dashboard] 查找记录时出错:`, e)
     }
 
-    points.push({
+    // 聚合该时间段的记录
+    let aggregatedPoint: HistoryPoint = {
       time: currentTime.toISOString(),
-      status: recordInRange ? (recordInRange.status as "up" | "down") : null,
-      latency_ms: recordInRange ? recordInRange.latency_ms : null,
-      status_code: recordInRange ? recordInRange.status_code : null,
-      error: recordInRange ? recordInRange.error : null,
-    })
+      status: null,
+      latency_ms: null,
+      status_code: null,
+      error: null,
+    }
+
+    if (recordsInRange.length > 0) {
+      // 策略1: 只要有一个 down，就显示 down（保守策略）
+      const hasDown = recordsInRange.some(r => r.status === 'down')
+      aggregatedPoint.status = hasDown ? 'down' : 'up'
+
+      // 策略2: 优先选择最后一个失败点，否则选最新的成功点
+      const representativeRecord = hasDown
+        ? recordsInRange.find(r => r.status === 'down') // 找到第一个失败（因为是DESC，实际是最后一个失败）
+        : recordsInRange[0]
+
+      if (representativeRecord) {
+        aggregatedPoint.latency_ms = representativeRecord.latency_ms
+        aggregatedPoint.status_code = representativeRecord.status_code
+        aggregatedPoint.error = representativeRecord.error
+      }
+    }
+
+    points.push(aggregatedPoint)
 
     currentTime = endTime
   }
