@@ -21,14 +21,6 @@ export const metadata: Metadata = {
   description: "一个轻量的网站 / API 可用性监控面板",
 };
 
-const themeBootScript = `(()=>{
-  const hour = new Date().getHours();
-  const isDark = hour >= 19 || hour < 7;
-  const root = document.documentElement;
-  root.classList.toggle('dark', isDark);
-  root.style.colorScheme = isDark ? 'dark' : 'light';
-})();`;
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -36,17 +28,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" suppressHydrationWarning className={cn("font-mono", jetbrainsMono.variable)}>
-      <head>
-        <script
-          id="theme-boot"
-          dangerouslySetInnerHTML={{ __html: themeBootScript }}
-        />
-      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="dark"
+          enableSystem={false}
           disableTransitionOnChange
         >
           {children}

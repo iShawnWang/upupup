@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Activity, RefreshCcw } from "lucide-react"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { StatusCard } from "./status-card"
 import type { DashboardResponse } from "@/app/api/dashboard/route"
 import { Button } from "./ui/button"
@@ -79,8 +80,8 @@ export function DashboardView({ initialData }: { initialData: DashboardResponse 
 
   return (
     <div className="flex flex-col gap-6 sm:gap-8">
-      <header className="flex flex-col gap-4 rounded-3xl border bg-white/30 p-4 backdrop-blur-sm dark:bg-black/10 sm:p-6 lg:flex-row lg:items-end lg:justify-between">
-        <div className="min-w-0">
+      <header className="flex flex-col gap-4 rounded-3xl border bg-white/30 p-4 backdrop-blur-sm dark:bg-black/10 sm:p-6 lg:flex-row lg:items-stretch lg:justify-between relative">
+        <div className="min-w-0 flex-1">
           <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-border/40 bg-background/60 px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
             <Activity className="h-3.5 w-3.5 text-emerald-500" />
             网站 / API 可用性监控
@@ -93,18 +94,21 @@ export function DashboardView({ initialData }: { initialData: DashboardResponse 
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-2 sm:flex sm:items-center sm:gap-3">
-          <div className="rounded-2xl border border-border/40 bg-background/60 px-3 py-2 text-center shadow-sm sm:min-w-24">
-            <div className="font-mono text-lg font-semibold text-foreground">{summary.total}</div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Total</div>
-          </div>
-          <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center shadow-sm sm:min-w-24">
-            <div className="font-mono text-lg font-semibold text-emerald-500">{summary.up}</div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600/80 dark:text-emerald-400/80">Up</div>
-          </div>
-          <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-center shadow-sm sm:min-w-24">
-            <div className="font-mono text-lg font-semibold text-red-500">{summary.down}</div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-red-600/80 dark:text-red-400/80">Down</div>
+        <div className="flex flex-col items-end gap-3 justify-between">
+          <ThemeToggle />
+          <div className="grid grid-cols-3 gap-2">
+            <div className="rounded-2xl border border-border/40 bg-background/60 px-3 py-2 text-center shadow-sm sm:min-w-24">
+              <div className="font-mono text-lg font-semibold text-foreground">{summary.total}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Total</div>
+            </div>
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center shadow-sm sm:min-w-24">
+              <div className="font-mono text-lg font-semibold text-emerald-500">{summary.up}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600/80 dark:text-emerald-400/80">Up</div>
+            </div>
+            <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-center shadow-sm sm:min-w-24">
+              <div className="font-mono text-lg font-semibold text-red-500">{summary.down}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-red-600/80 dark:text-red-400/80">Down</div>
+            </div>
           </div>
         </div>
       </header>
