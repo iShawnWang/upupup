@@ -19,7 +19,7 @@ function getInitialLocale(): Locale {
   if (typeof window === "undefined") return DEFAULT_LOCALE
 
   // 1. Check cookie first
-  const match = document.cookie.match(/(?:^|;\s*)locale=([^;]*)/)
+  const match = document.cookie.match(/(?:^|;\s*)upupup-locale=([^;]*)/)
   if (match && LOCALES.includes(match[1] as Locale)) {
     return match[1] as Locale
   }
@@ -33,7 +33,7 @@ function getInitialLocale(): Locale {
 }
 
 function setLocaleCookie(locale: Locale) {
-  document.cookie = `locale=${locale};path=/;max-age=31536000;SameSite=Lax`
+  document.cookie = `upupup-locale=${locale};path=/;max-age=31536000;SameSite=Lax`
 }
 
 interface I18nContextValue {
