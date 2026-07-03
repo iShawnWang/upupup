@@ -2,12 +2,12 @@ import { NextResponse, NextRequest } from "next/server"
 import { getDb, CheckRecord } from "@/lib/db"
 import { getMonitorsFromEnv } from "@/lib/config"
 
-// 时间范围配置
+// 时间范围配置（label 为 i18n 翻译 key，由前端按语言渲染）
 const TIME_RANGES = [
-  { id: "1h", label: "1小时(分钟)", rangeMs: 60 * 60 * 1000, granularityMs: 60 * 1000, default: true },
-  { id: "12h", label: "12小时(分钟)", rangeMs: 12 * 60 * 60 * 1000, granularityMs: 60 * 1000 },
-  { id: "24h", label: "24小时(小时)", rangeMs: 24 * 60 * 60 * 1000, granularityMs: 60 * 60 * 1000 },
-  { id: "30d", label: "30天(天)", rangeMs: 30 * 24 * 60 * 60 * 1000, granularityMs: 24 * 60 * 60 * 1000 },
+  { id: "1h", label: "control.range.1h", rangeMs: 60 * 60 * 1000, granularityMs: 60 * 1000, default: true },
+  { id: "12h", label: "control.range.12h", rangeMs: 12 * 60 * 60 * 1000, granularityMs: 60 * 1000 },
+  { id: "24h", label: "control.range.24h", rangeMs: 24 * 60 * 60 * 1000, granularityMs: 60 * 60 * 1000 },
+  { id: "30d", label: "control.range.30d", rangeMs: 30 * 24 * 60 * 60 * 1000, granularityMs: 24 * 60 * 60 * 1000 },
 ]
 
 // 单个时间点的数据
