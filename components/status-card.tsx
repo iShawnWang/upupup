@@ -4,7 +4,7 @@ import { Globe2, Radio, Zap } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { HistoryGrid } from "./history-grid"
 import { cn } from "@/lib/utils"
-import type { MonitorData } from "@/app/api/dashboard/route"
+import { useI18n } from "@/lib/i18n/context"
 
 const formatLatency = (value: number | null | undefined) =>
   typeof value === "number" ? `${value} ms` : "—"
@@ -16,6 +16,7 @@ interface StatusCardProps {
 }
 
 export function StatusCard({ monitor, time_ranges = [], selectedRangeId }: StatusCardProps) {
+  const { t } = useI18n()
   const isUp = monitor.status === "up"
 
   return (
@@ -54,7 +55,7 @@ export function StatusCard({ monitor, time_ranges = [], selectedRangeId }: Statu
           <div className="rounded-xl bg-muted/30 p-3 transition-colors group-hover:bg-muted/50">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Zap className="h-3.5 w-3.5" />
-              <span className="text-[10px] font-semibold uppercase tracking-wider">延迟</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider">{t("card.latency")}</span>
             </div>
             <div className="mt-1 font-mono text-lg font-medium leading-none text-foreground">
               {formatLatency(monitor.latency_ms)}
@@ -64,7 +65,7 @@ export function StatusCard({ monitor, time_ranges = [], selectedRangeId }: Statu
           <div className="rounded-xl bg-muted/30 p-3 transition-colors group-hover:bg-muted/50">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Radio className="h-3.5 w-3.5" />
-              <span className="text-[10px] font-semibold uppercase tracking-wider">24h 在线率</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wider">{t("card.uptime24h")}</span>
             </div>
             <div className="mt-1 font-mono text-lg font-medium leading-none text-foreground">
               {monitor.uptime_24h}%
@@ -77,7 +78,7 @@ export function StatusCard({ monitor, time_ranges = [], selectedRangeId }: Statu
             <div className="rounded-xl bg-muted/30 p-3 transition-colors group-hover:bg-muted/50">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Radio className="h-3.5 w-3.5" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider">7d 在线率</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider">{t("card.uptime7d")}</span>
               </div>
               <div className="mt-1 font-mono text-lg font-medium leading-none text-foreground">
                 {monitor.uptime_7d}%
@@ -86,20 +87,20 @@ export function StatusCard({ monitor, time_ranges = [], selectedRangeId }: Statu
             <div className="rounded-xl bg-muted/30 p-3 transition-colors group-hover:bg-muted/50">
               <div className="flex items-center gap-2 text-muted-foreground">
                 <Radio className="h-3.5 w-3.5" />
-                <span className="text-[10px] font-semibold uppercase tracking-wider">最近状态</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wider">{t("card.lastStatus")}</span>
               </div>
               <div className={cn(
                 "mt-1 font-mono text-lg font-medium uppercase leading-none",
                 isUp ? "text-emerald-500" : "text-red-500"
               )}>
-                {isUp ? "OK" : "FAIL"}
+                {isUp ? t("card.ok") : t("card.fail")}
               </div>
             </div>
           </div>
           {!isUp && monitor.last_error && (
             <div className="mt-4 rounded-xl bg-red-500/10 border border-red-500/20 p-3">
               <div className="flex items-center gap-2 text-red-500 text-[10px] font-semibold uppercase tracking-wider mb-2">
-                最近错误
+                {t("card.recentError")}
               </div>
               <pre className="text-red-400 text-[11px] whitespace-pre-wrap break-all font-mono leading-relaxed">
                 {monitor.last_error}
