@@ -1,77 +1,80 @@
 # upupup
 
-一个轻量的网站 / API 可用性监控面板，配置全在 `.env`，本地一键启动，无需任何云服务。
+English | [中文](README.zh-CN.md)
+
+A lightweight website and API uptime monitoring dashboard. All targets are configured in `.env`, it runs locally with one command, and it does not require any cloud service.
 
 ---
 
-## ✨ 功能特性
+## Features
 
-### 📊 实时监控面板
-- 一目了然的监控概览，显示 Up/Down 统计
-- 每个监控卡片显示当前状态、延迟、在线率
-- 30秒自动刷新数据
+### Real-time monitoring dashboard
+- At-a-glance availability overview with Up/Down counts.
+- Each monitor card shows the current status, latency, and uptime.
+- Dashboard data refreshes automatically every 30 seconds.
 
-![主 Dashboard 概览](public/dashboard.png)
+![Dashboard overview](public/dashboard.png)
 
-### 🎯 智能检测
-- HTTP 状态码验证（可自定义期望状态码）
-- 关键词匹配检查（响应体包含指定关键词才算成功）
-- 支持自定义超时时间
-- 失败时记录完整的错误信息（响应体、响应头、请求详情）
+### Smart checks
+- Validate HTTP status codes with configurable expected statuses.
+- Check for required keywords in the response body.
+- Configure per-monitor request timeouts.
+- Store detailed failure information, including response body, response headers, and request details.
 
-### 📈 多时间范围历史
-- 支持 4 种时间范围：
-  - 1小时（分钟级粒度）
-  - 12小时（分钟级粒度）
-  - 24小时（小时级粒度）
-  - 30天（天级粒度）
-- 智能聚合：时间段内有任何失败则显示为失败
-- Hover 查看详细的历史记录信息
+### Multi-range history
+- Supports four time ranges:
+  - 1 hour, minute-level granularity.
+  - 12 hours, minute-level granularity.
+  - 24 hours, hour-level granularity.
+  - 30 days, day-level granularity.
+- Aggregates failures conservatively: if any check fails in a bucket, that bucket is shown as failed.
+- Hover over history cells to inspect detailed records.
 
-![Hover 卡片详情](public/hover.png)
+![Hover details](public/hover.png)
 
-### 🌙 主题切换
-- 支持亮色、暗色、跟随系统三种模式
-- 根据时间自动切换（夜间自动暗色）
-- 本地保存主题偏好
+### Theme switching
+- Supports light, dark, and system themes.
+- Can automatically switch based on time of day.
+- Saves theme preference locally.
 
-![暗色主题效果](public/dark-theme.png)
+![Dark theme](public/dark-theme.png)
 
 ---
 
-## 🚀 快速开始
+## Quick Start
 
-### 前置要求
+### Requirements
 - Node.js 18+
-- pnpm（或 npm/yarn）
+- pnpm, npm, or yarn
 
-### 1. 克隆/下载项目
+### 1. Clone or download the project
 ```bash
-git clone <你的仓库地址>
+git clone <your-repository-url>
 cd upupup
 ```
 
-### 2. 安装依赖
+### 2. Install dependencies
 ```bash
 pnpm install
 ```
 
-### 3. 配置监控目标
+### 3. Configure monitor targets
 ```bash
 cp .env.example .env
 ```
 
-编辑 `.env` 文件，配置你的监控目标：
+Edit `.env` and configure your monitor targets:
+
 ```env
-# 监控目标，JSON 数组
+# Monitor targets as a JSON array.
 MONITORS='[
   {
-    "name": "我的网站",
+    "name": "My website",
     "url": "https://example.com",
     "keyword": "Welcome"
   },
   {
-    "name": "API 健康检查",
+    "name": "API health check",
     "url": "https://api.example.com/health",
     "method": "GET",
     "expectedStatus": 200,
@@ -79,87 +82,87 @@ MONITORS='[
   }
 ]'
 
-# 检测间隔（秒），最小 30
+# Check interval in seconds. Minimum: 30.
 CHECK_INTERVAL_SECONDS=60
 
-# 历史保留天数
+# Number of days to retain history.
 HISTORY_RETENTION_DAYS=90
 
-# SQLite 文件路径
+# SQLite database file path.
 DB_PATH=./data/monitor.db
 ```
 
-### 4. 启动开发服务
+### 4. Start the development server
 ```bash
 pnpm dev
 ```
 
-访问 http://localhost:3001 即可查看面板！
+Open http://localhost:3001 to view the dashboard.
 
 ---
 
-## ⚙️ 配置参考
+## Configuration
 
-### MONITORS 配置项
+### `MONITORS`
 
-| 字段 | 类型 | 必填 | 默认 | 说明 |
-|------|------|------|------|------|
-| name | string | ✅ | - | 监控目标名称，用于展示 |
-| url | string | ✅ | - | 监控的 URL 地址 |
-| method | string | ❌ | GET | HTTP 方法（GET/POST/PUT 等） |
-| keyword | string | ❌ | - | 响应体需包含的关键词 |
-| expectedStatus | number | ❌ | 200 | 期望的 HTTP 状态码 |
-| timeout | number | ❌ | 30000 | 超时时间（毫秒） |
+| Field | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| `name` | string | Yes | - | Display name for the monitor target. |
+| `url` | string | Yes | - | URL to monitor. |
+| `method` | string | No | `GET` | HTTP method, such as `GET`, `POST`, or `PUT`. |
+| `keyword` | string | No | - | Required keyword in the response body. |
+| `expectedStatus` | number | No | `200` | Expected HTTP status code. |
+| `timeout` | number | No | `30000` | Request timeout in milliseconds. |
 
-### 其他配置项
+### Other environment variables
 
-| 环境变量 | 默认 | 说明 |
-|----------|------|------|
-| CHECK_INTERVAL_SECONDS | 60 | 检测间隔，最小 30 秒 |
-| HISTORY_RETENTION_DAYS | 90 | 历史数据保留天数 |
-| DB_PATH | ./data/monitor.db | SQLite 数据库文件路径 |
-| PORT | 3001 | 服务监听端口 |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CHECK_INTERVAL_SECONDS` | `60` | Check interval. Minimum: 30 seconds. |
+| `HISTORY_RETENTION_DAYS` | `90` | Number of days to retain historical data. |
+| `DB_PATH` | `./data/monitor.db` | SQLite database file path. |
+| `PORT` | `3001` | Server port. |
 
 ---
 
-## 📦 部署指南
+## Deployment
 
-### 使用 PM2 部署（推荐）
+### Deploy with PM2
 
-#### 1. 构建项目
+#### 1. Build the project
 ```bash
 pnpm build
 ```
 
-#### 2. 启动服务
+#### 2. Start the service
 ```bash
 pm2 start ecosystem.config.js
 ```
 
-访问 http://localhost:3001 即可查看面板！
+Open http://localhost:3001 to view the dashboard.
 
-#### 3. 查看状态和日志
+#### 3. View status and logs
 ```bash
 pm2 status
 pm2 logs upupup
 ```
 
-#### 4. 设置开机自启
+#### 4. Enable startup on boot
 ```bash
 pm2 save
 pm2 startup
 ```
 
-### 使用 Docker 部署
+### Deploy with Docker
 
-#### 使用 docker-compose
+#### With docker-compose
 ```bash
 cp .env.example .env
-# 编辑 .env 配置你的监控目标
+# Edit .env and configure your monitor targets.
 docker-compose up -d --build
 ```
 
-#### 使用 docker 命令
+#### With docker
 ```bash
 docker build -t upupup .
 
@@ -172,57 +175,56 @@ docker run -d \
   upupup
 ```
 
-数据会持久化在 `./data` 目录下。
+Data is persisted in the `./data` directory.
 
 ---
 
-## 🏗️ 技术架构
+## Architecture
 
-### 技术栈
-- **框架**: Next.js 16 App Router
-- **数据库**: SQLite + better-sqlite3
-- **定时任务**: node-cron
+### Tech stack
+- **Framework**: Next.js 16 App Router
+- **Database**: SQLite + better-sqlite3
+- **Scheduled jobs**: node-cron
 - **UI**: shadcn/ui + Tailwind CSS
-- **主题**: next-themes
+- **Theme**: next-themes
 
-### 项目结构
-```
+### Project structure
+```text
 upupup/
 ├── app/
-│   ├── api/dashboard/route.ts  # 数据聚合 API
-│   ├── page.tsx                # 首页
-│   ├── layout.tsx              # 布局（主题支持）
+│   ├── api/dashboard/route.ts  # Aggregated dashboard API
+│   ├── page.tsx                # Home page
+│   ├── layout.tsx              # Layout with theme support
 │   └── globals.css
 ├── components/
-│   ├── ui/                     # shadcn/ui 组件
-│   ├── dashboard-view.tsx      # Dashboard 主视图
-│   ├── status-card.tsx         # 监控卡片
-│   ├── history-grid.tsx        # 历史时间轴
-│   ├── theme-toggle.tsx        # 主题切换
+│   ├── ui/                     # shadcn/ui components
+│   ├── dashboard-view.tsx      # Main dashboard view
+│   ├── status-card.tsx         # Monitor card
+│   ├── history-grid.tsx        # Historical timeline
+│   ├── theme-toggle.tsx        # Theme switcher
 │   └── theme-provider.tsx
 ├── lib/
-│   ├── checker.ts              # 检测逻辑
-│   ├── cron.ts                 # 定时任务
-│   ├── db.ts                   # 数据库操作
-│   ├── config.ts               # 配置解析
+│   ├── checker.ts              # Check execution
+│   ├── cron.ts                 # Scheduled task bootstrap
+│   ├── db.ts                   # Database operations
+│   ├── config.ts               # Configuration parsing
 │   └── utils.ts
-├── instrumentation.ts          # 服务启动钩子
-├── ecosystem.config.js         # PM2 配置
+├── instrumentation.ts          # Server startup hook
+├── ecosystem.config.js         # PM2 configuration
 ├── docker-compose.yml
 ├── Dockerfile
 └── .env
 ```
 
-### 数据流程
+### Data flow
+```text
+.env configuration
+  |
+instrumentation.ts -> cron.ts starts scheduled checks
+  |
+checker.ts executes checks -> writes to SQLite
+  |
+/api/dashboard/route.ts aggregates data
+  |
+Dashboard UI refreshes every 30 seconds
 ```
-.env 配置
-  ↓
-instrumentation.ts → cron.ts 启动定时任务
-  ↓
-checker.ts 执行检测 → 写入 SQLite
-  ↓
-/api/dashboard/route.ts 聚合数据
-  ↓
-Dashboard UI (30s 自动刷新)
-```
-
