@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server"
 
 const VALID_LOCALES = ["zh", "en"]
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const cookieLocale = request.cookies.get("upupup-locale")?.value
   const locale = VALID_LOCALES.includes(cookieLocale ?? "") ? cookieLocale! : "zh"
 
