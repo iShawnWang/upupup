@@ -9,6 +9,34 @@ export interface CheckResult {
   error: string | null
 }
 
+export interface SavedCheckRecord {
+  name: string
+  status: "up" | "down"
+  checked_at: string
+  latency_ms: number | null
+  status_code: number | null
+  duration_ms: number
+  db_duration_ms: number
+  error: string | null
+}
+
+interface CheckContext {
+  runId?: number
+  trigger?: string
+}
+
+function errorSummary(error: unknown): string {
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}`
+  }
+  return String(error)
+}
+
+function compactError(error: string | null) {
+  if (!error) return null
+  return error.replace(/\s+/g, " ").slice(0, 240)
+}
+
 export async function checkMonitor(monitor: MonitorConfig): Promise<CheckResult> {
   const controller = new AbortController()
   const timeoutMs = monitor.timeout ?? 30000
@@ -105,12 +133,22 @@ export async function checkMonitor(monitor: MonitorConfig): Promise<CheckResult>
   }
 }
 
-export async function checkAndSave(monitor: MonitorConfig) {
+export async function checkAndSave(monitor: MonitorConfig, context: CheckContext = {}): Promise<SavedCheckRecord> {
+  const runLabel = context.runId ?? "-"
+  const checkStartedAt = new Date()
+  const checkStart = performance.now()
+
+  console.log(
+    `[check] run=${runLabel} trigger=${context.trigger ?? "-"} name="${monitor.name}" start at=${checkStartedAt.toISOString()} method=${monitor.method} timeoutMs=${monitor.timeout ?? 30000}`
+  )
+
   try {
     const result = await checkMonitor(monitor)
+    const duration_ms = Math.round(performance.now() - checkStart)
     const now = new Date().toISOString()
 
     try {
+      const dbStart = performance.now()
       insertCheckRecord({
         name: monitor.name,
         url: monitor.url,
@@ -121,13 +159,34 @@ export async function checkAndSave(monitor: MonitorConfig) {
         error: result.error,
         checked_at: now,
       })
-      console.log(`[check] ✅ ${monitor.name} ${result.status} ${result.latency_ms}ms`)
+      const db_duration_ms = Math.round(performance.now() - dbStart)
+      console.log(
+        `[check] run=${runLabel} name="${monitor.name}" saved status=${result.status} checked_at=${now} latencyMs=${result.latency_ms ?? "-"} statusCode=${result.status_code ?? "-"} durationMs=${duration_ms} dbDurationMs=${db_duration_ms} error=${compactError(result.error) ?? "-"}`
+      )
+
+      return {
+        name: monitor.name,
+        status: result.status,
+        checked_at: now,
+        latency_ms: result.latency_ms,
+        status_code: result.status_code,
+        duration_ms,
+        db_duration_ms,
+        error: result.error,
+      }
     } catch (dbError) {
-      console.error(`[check] ❌ ${monitor.name} 数据库写入失败:`, dbError)
+      console.error(
+        `[check] run=${runLabel} name="${monitor.name}" db-write-failed checked_at=${now} durationMs=${duration_ms} error=${errorSummary(dbError)}`,
+        dbError
+      )
       throw dbError
     }
   } catch (error) {
-    console.error(`[check] ❌ ${monitor.name} 检测流程异常:`, error)
+    const duration_ms = Math.round(performance.now() - checkStart)
+    console.error(
+      `[check] run=${runLabel} name="${monitor.name}" failed durationMs=${duration_ms} error=${errorSummary(error)}`,
+      error
+    )
     throw error
   }
 }

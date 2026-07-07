@@ -5,28 +5,116 @@ import { cleanOldHistory } from "./db"
 import { formatDate } from "./utils"
 
 let cronJob: cron.ScheduledTask | null = null
+let heartbeatTimer: NodeJS.Timeout | null = null
+let processDiagnosticsRegistered = false
+let activeRuns = 0
+let runSeq = 0
+let lastRunStartedAt: number | null = null
+
+function summarizeError(error: unknown): string {
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}`
+  }
+  return String(error)
+}
+
+function registerProcessDiagnostics() {
+  if (processDiagnosticsRegistered) return
+  processDiagnosticsRegistered = true
+
+  console.log(
+    `[process] started pid=${process.pid} node=${process.version} platform=${process.platform} arch=${process.arch} cwd=${process.cwd()} startedAt=${new Date().toISOString()} tzOffsetMin=${new Date().getTimezoneOffset()}`
+  )
+
+  process.on("beforeExit", (code) => {
+    console.warn(`[process] beforeExit code=${code} uptimeSec=${Math.round(process.uptime())}`)
+  })
+
+  process.on("exit", (code) => {
+    console.warn(`[process] exit code=${code} uptimeSec=${Math.round(process.uptime())}`)
+  })
+
+  process.on("warning", (warning) => {
+    console.warn(`[process] warning name=${warning.name} message=${warning.message}`, warning)
+  })
+
+  process.on("uncaughtExceptionMonitor", (error) => {
+    console.error(`[process] uncaughtExceptionMonitor error=${summarizeError(error)}`, error)
+  })
+
+  process.on("unhandledRejection", (reason) => {
+    console.error(`[process] unhandledRejection reason=${summarizeError(reason)}`, reason)
+  })
+}
+
+function startSchedulerHeartbeat(intervalSeconds: number) {
+  if (heartbeatTimer) return
+
+  const heartbeatMs = Math.max(10_000, intervalSeconds * 1000)
+  const warnAfterMs = Math.max(heartbeatMs * 1.5, heartbeatMs + 10_000)
+  let lastHeartbeatAt = Date.now()
+
+  heartbeatTimer = setInterval(() => {
+    const now = Date.now()
+    const gapMs = now - lastHeartbeatAt
+    if (gapMs > warnAfterMs) {
+      console.warn(
+        `[cron] heartbeat-delay gapMs=${gapMs} expectedMs=${heartbeatMs} now=${new Date(now).toISOString()} lastHeartbeatAt=${new Date(lastHeartbeatAt).toISOString()}`
+      )
+    }
+    lastHeartbeatAt = now
+  }, heartbeatMs)
+
+  heartbeatTimer.unref?.()
+}
 
 export function startCron() {
   if (cronJob) return
+
+  registerProcessDiagnostics()
 
   const intervalSeconds = getCheckIntervalSeconds()
   const retentionDays = getHistoryRetentionDays()
   const monitors = getMonitorsFromEnv()
 
-  console.log(`[cron] 启动定时任务，间隔 ${intervalSeconds} 秒，保留 ${retentionDays} 天历史`)
+  console.log(
+    `[cron] 启动定时任务，间隔 ${intervalSeconds} 秒，保留 ${retentionDays} 天历史 env.NODE_ENV=${process.env.NODE_ENV ?? "-"} env.DB_PATH=${process.env.DB_PATH ?? "-"}`
+  )
   console.log(`[cron] 监控目标: ${monitors.map((m) => m.name).join(", ")}`)
+  startSchedulerHeartbeat(intervalSeconds)
 
-  const doCheck = async () => {
-    console.log(`[cron] 开始检测... ${formatDate(new Date())}`)
+  const doCheck = async (trigger = "schedule") => {
+    const runId = ++runSeq
+    const startedAt = new Date()
+    const startedAtMs = startedAt.getTime()
+    const previousGapMs = lastRunStartedAt === null ? null : startedAtMs - lastRunStartedAt
+    lastRunStartedAt = startedAtMs
+    activeRuns += 1
+
+    console.log(
+      `[cron] run=${runId} start trigger=${trigger} at=${startedAt.toISOString()} local=${formatDate(startedAt)} previousGapMs=${previousGapMs ?? "-"} activeRuns=${activeRuns} monitorCount=${monitors.length}`
+    )
+
+    if (previousGapMs !== null && previousGapMs > intervalSeconds * 1000 * 1.5) {
+      console.warn(
+        `[cron] run=${runId} schedule-gap previousGapMs=${previousGapMs} expectedMs=${intervalSeconds * 1000} previousGapSec=${Math.round(previousGapMs / 1000)}`
+      )
+    }
+
+    if (activeRuns > 1) {
+      console.warn(`[cron] run=${runId} overlap activeRuns=${activeRuns}`)
+    }
 
     try {
       const results = await Promise.allSettled(
         monitors.map(async (monitor) => {
           try {
-            await checkAndSave(monitor)
-            console.log(`[cron] ✅ ${monitor.name} 检测成功`)
+            const saved = await checkAndSave(monitor, { runId, trigger })
+            console.log(
+              `[cron] run=${runId} monitor="${monitor.name}" fulfilled status=${saved.status} checked_at=${saved.checked_at} durationMs=${saved.duration_ms} dbDurationMs=${saved.db_duration_ms}`
+            )
           } catch (error) {
-            console.error(`[cron] ❌ ${monitor.name} 检测失败:`, error)
+            console.error(`[cron] run=${runId} monitor="${monitor.name}" rejected error=${summarizeError(error)}`, error)
             throw error
           }
         })
@@ -35,26 +123,30 @@ export function startCron() {
       // 统计执行结果
       const successCount = results.filter(r => r.status === 'fulfilled').length
       const failCount = results.filter(r => r.status === 'rejected').length
-      console.log(`[cron] 检测结果: 成功 ${successCount}, 失败 ${failCount}`)
+      console.log(`[cron] run=${runId} result success=${successCount} failed=${failCount}`)
 
       if (failCount > 0) {
-        console.error(`[cron] 失败详情:`, results)
+        console.error(`[cron] run=${runId} failure-details:`, results)
       }
 
       try {
         cleanOldHistory(retentionDays)
       } catch (cleanError) {
-        console.error(`[cron] 清理旧记录失败:`, cleanError)
+        console.error(`[cron] run=${runId} clean-old-history-failed error=${summarizeError(cleanError)}`, cleanError)
       }
 
     } catch (error) {
-      console.error(`[cron] 检测流程异常:`, error)
+      console.error(`[cron] run=${runId} flow-failed error=${summarizeError(error)}`, error)
+    } finally {
+      activeRuns -= 1
+      const durationMs = Date.now() - startedAtMs
+      console.log(
+        `[cron] run=${runId} finish at=${new Date().toISOString()} local=${formatDate(new Date())} durationMs=${durationMs} activeRuns=${activeRuns}`
+      )
     }
-
-    console.log(`[cron] 检测完成 ${formatDate(new Date())}`)
   }
 
-  doCheck()
+  doCheck("startup")
 
   let cronExpression: string
   if (intervalSeconds === 60) {
@@ -71,12 +163,16 @@ export function startCron() {
   }
 
   console.log(`[cron] 使用 cron 表达式: ${cronExpression}`)
-  cronJob = cron.schedule(cronExpression, doCheck)
+  cronJob = cron.schedule(cronExpression, () => doCheck("schedule"))
 }
 
 export function stopCron() {
   if (cronJob) {
     cronJob.stop()
     cronJob = null
+  }
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer)
+    heartbeatTimer = null
   }
 }

@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from "next/server"
 import { getDb, CheckRecord } from "@/lib/db"
 import { getMonitorsFromEnv } from "@/lib/config"
+import { formatDate } from "@/lib/utils"
 
 // 时间范围配置（label 为 i18n 翻译 key，由前端按语言渲染）
 const TIME_RANGES = [
@@ -47,6 +48,11 @@ function calculateUptime(records: CheckRecord[]): number {
   return Math.round((up / records.length) * 100)
 }
 
+function formatLogTime(dateLike: Date | string): string {
+  const date = dateLike instanceof Date ? dateLike : new Date(dateLike)
+  return Number.isNaN(date.getTime()) ? String(dateLike) : formatDate(date)
+}
+
 // 聚合指定时间范围内的记录
 function aggregateRecords(
   records: CheckRecord[],
@@ -65,7 +71,7 @@ function aggregateRecords(
   const startTime = new Date(nowAligned.getTime() - rangeMs)
   const startTimeAligned = alignToGranularity(startTime, granularityMs)
 
-  console.log(`[dashboard] 聚合记录: startTime=${startTimeAligned.toISOString()}, now=${nowAligned.toISOString()}, records=${records.length}, granularity=${granularityMs}ms`)
+  console.log(`[dashboard] 聚合记录: startTime=${formatLogTime(startTimeAligned)}, now=${formatLogTime(nowAligned)}, records=${records.length}, granularity=${granularityMs}ms`)
 
   // 过滤时间范围内的记录
   const filteredRecords = records.filter(r => {
@@ -172,7 +178,7 @@ export async function GET(request: NextRequest) {
         }
 
         const latest = allRecords[0]
-        console.log(`[dashboard] ${monitor.name}: latest=`, latest ? { status: latest.status, time: latest.checked_at } : 'none')
+        console.log(`[dashboard] ${monitor.name}: latest=`, latest ? { status: latest.status, time: formatLogTime(latest.checked_at) } : 'none')
 
         const records24h = allRecords.filter(
           (r) => {
