@@ -9,6 +9,7 @@ import type { DashboardResponse } from "@/app/api/dashboard/route"
 import { Button } from "./ui/button"
 import { useI18n } from "@/lib/i18n/context"
 import type { Translations } from "@/lib/i18n/types"
+import { DEFAULT_TIME_RANGE_ID } from "@/lib/time-ranges"
 
 export function DashboardView({ initialData }: { initialData: DashboardResponse }) {
   const { t, locale } = useI18n()
@@ -24,7 +25,7 @@ export function DashboardView({ initialData }: { initialData: DashboardResponse 
       }
     }
     const defaultRange = data.time_ranges?.find(r => r.default)
-    return defaultRange?.id || data.time_ranges?.[0]?.id || "1h"
+    return defaultRange?.id || data.time_ranges?.[0]?.id || DEFAULT_TIME_RANGE_ID
   })
 
   useEffect(() => {
@@ -50,7 +51,7 @@ export function DashboardView({ initialData }: { initialData: DashboardResponse 
       if (!isMounted) return
 
       try {
-        const res = await fetch("/api/dashboard", {
+        const res = await fetch(`/api/dashboard?range=${encodeURIComponent(selectedRangeId)}`, {
           cache: "no-store"
         })
         if (!res.ok) {
@@ -76,7 +77,7 @@ export function DashboardView({ initialData }: { initialData: DashboardResponse 
         clearInterval(intervalId)
       }
     }
-  }, [])
+  }, [selectedRangeId])
 
   return (
     <div className="flex flex-col gap-6 sm:gap-8">

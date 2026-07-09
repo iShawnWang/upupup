@@ -4,6 +4,7 @@ import { DashboardView } from "@/components/dashboard-view"
 import { I18nProvider, useI18n } from "@/lib/i18n/context"
 import { useState, useEffect } from "react"
 import type { DashboardResponse } from "@/app/api/dashboard/route"
+import { DEFAULT_TIME_RANGE_ID } from "@/lib/time-ranges"
 
 function HomeContent() {
   const { t } = useI18n()
@@ -17,7 +18,9 @@ function HomeContent() {
       if (!isMounted) return
 
       try {
-        const res = await fetch("/api/dashboard", {
+        const savedRange = localStorage.getItem("upupup-selected-range")
+        const initialRangeId = savedRange || DEFAULT_TIME_RANGE_ID
+        const res = await fetch(`/api/dashboard?range=${encodeURIComponent(initialRangeId)}`, {
           cache: 'no-store'
         })
         if (!res.ok) {

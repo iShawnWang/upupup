@@ -2,14 +2,7 @@ import { NextResponse, NextRequest } from "next/server"
 import { getDb, CheckRecord } from "@/lib/db"
 import { getMonitorsFromEnv } from "@/lib/config"
 import { formatDate } from "@/lib/utils"
-
-// 时间范围配置（label 为 i18n 翻译 key，由前端按语言渲染）
-const TIME_RANGES = [
-  { id: "1h", label: "control.range.1h", rangeMs: 60 * 60 * 1000, granularityMs: 60 * 1000, default: true },
-  { id: "12h", label: "control.range.12h", rangeMs: 12 * 60 * 60 * 1000, granularityMs: 60 * 1000 },
-  { id: "24h", label: "control.range.24h", rangeMs: 24 * 60 * 60 * 1000, granularityMs: 60 * 60 * 1000 },
-  { id: "30d", label: "control.range.30d", rangeMs: 30 * 24 * 60 * 60 * 1000, granularityMs: 24 * 60 * 60 * 1000 },
-]
+import { TIME_RANGES } from "@/lib/time-ranges"
 
 // 单个时间点的数据
 export interface HistoryPoint {
@@ -42,10 +35,9 @@ export interface DashboardResponse {
   time_ranges: typeof TIME_RANGES
 }
 
-function calculateUptime(records: CheckRecord[]): number {
-  if (records.length === 0) return 0
-  const up = records.filter((r) => r.status === "up").length
-  return Math.round((up / records.length) * 100)
+function calculateUptimeFromCounts(total: number, up: number): number {
+  if (total === 0) return 0
+  return Math.round((up / total) * 100)
 }
 
 function formatLogTime(dateLike: Date | string): string {
@@ -71,39 +63,45 @@ function aggregateRecords(
   const startTime = new Date(nowAligned.getTime() - rangeMs)
   const startTimeAligned = alignToGranularity(startTime, granularityMs)
 
-  console.log(`[dashboard] 聚合记录: startTime=${formatLogTime(startTimeAligned)}, now=${formatLogTime(nowAligned)}, records=${records.length}, granularity=${granularityMs}ms`)
+  const buckets = new Map<number, {
+    hasDown: boolean
+    firstRecord: CheckRecord | null
+    firstDownRecord: CheckRecord | null
+  }>()
 
-  // 过滤时间范围内的记录
-  const filteredRecords = records.filter(r => {
+  for (const record of records) {
     try {
-      const recordTime = new Date(r.checked_at)
-      return recordTime >= startTimeAligned && recordTime <= nowAligned
-    } catch (e) {
-      console.warn(`[dashboard] 日期解析失败:`, r.checked_at, e)
-      return false
-    }
-  })
+      const recordTime = new Date(record.checked_at)
+      if (recordTime < startTimeAligned || recordTime > nowAligned) {
+        continue
+      }
 
-  console.log(`[dashboard] 过滤后记录: ${filteredRecords.length} 条`)
+      const bucketTime = alignToGranularity(recordTime, granularityMs).getTime()
+      let bucket = buckets.get(bucketTime)
+      if (!bucket) {
+        bucket = {
+          hasDown: false,
+          firstRecord: null,
+          firstDownRecord: null,
+        }
+        buckets.set(bucketTime, bucket)
+      }
+
+      bucket.firstRecord ??= record
+      if (record.status === "down") {
+        bucket.hasDown = true
+        bucket.firstDownRecord ??= record
+      }
+    } catch (e) {
+      console.warn(`[dashboard] 日期解析失败:`, record.checked_at, e)
+    }
+  }
 
   // 按粒度聚合
   const points: HistoryPoint[] = []
 
   let currentTime = new Date(startTimeAligned)
   while (currentTime < nowAligned) {
-    // 找到这个时间粒度内的所有记录
-    const endTime = new Date(currentTime.getTime() + granularityMs)
-
-    let recordsInRange: CheckRecord[] = []
-    try {
-      recordsInRange = filteredRecords.filter(r => {
-        const recordTime = new Date(r.checked_at)
-        return recordTime >= currentTime && recordTime < endTime
-      })
-    } catch (e) {
-      console.warn(`[dashboard] 查找记录时出错:`, e)
-    }
-
     // 聚合该时间段的记录
     let aggregatedPoint: HistoryPoint = {
       time: currentTime.toISOString(),
@@ -113,33 +111,25 @@ function aggregateRecords(
       error: null,
     }
 
-    if (recordsInRange.length > 0) {
-      // 策略1: 只要有一个 down，就显示 down（保守策略）
-      const hasDown = recordsInRange.some(r => r.status === 'down')
-      aggregatedPoint.status = hasDown ? 'down' : 'up'
-
-      // 策略2: 优先选择最后一个失败点，否则选最新的成功点
-      const representativeRecord = hasDown
-        ? recordsInRange.find(r => r.status === 'down') // 找到第一个失败（因为是DESC，实际是最后一个失败）
-        : recordsInRange[0]
-
-      if (representativeRecord) {
-        aggregatedPoint.latency_ms = representativeRecord.latency_ms
-        aggregatedPoint.status_code = representativeRecord.status_code
-        aggregatedPoint.error = representativeRecord.error
-      }
+    const bucket = buckets.get(currentTime.getTime())
+    if (bucket) {
+      const representativeRecord = bucket.hasDown ? bucket.firstDownRecord : bucket.firstRecord
+      aggregatedPoint.status = bucket.hasDown ? 'down' : 'up'
+      aggregatedPoint.latency_ms = representativeRecord?.latency_ms ?? null
+      aggregatedPoint.status_code = representativeRecord?.status_code ?? null
+      aggregatedPoint.error = representativeRecord?.error ?? null
     }
 
     points.push(aggregatedPoint)
 
-    currentTime = endTime
+    currentTime = new Date(currentTime.getTime() + granularityMs)
   }
 
-  console.log(`[dashboard] 生成 ${points.length} 个时间点`)
   return points
 }
 
 export async function GET(request: NextRequest) {
+  const requestStartedAt = performance.now()
   console.log(`[dashboard] 收到请求: ${request.url}`)
 
   try {
@@ -158,51 +148,55 @@ export async function GET(request: NextRequest) {
       time_ranges: TIME_RANGES,
     }
 
-    // 确定需要聚合哪些时间范围 - 默认返回所有范围
-    const rangesToAggregate = requestedRanges.length > 0
+    // 确定需要聚合哪些时间范围：无 range 参数时返回全部，range 无效时回退到默认范围。
+    const requestedRangesToAggregate = requestedRanges.length > 0
       ? TIME_RANGES.filter(r => requestedRanges.includes(r.id))
       : TIME_RANGES // 默认返回所有
+    const rangesToAggregate = requestedRangesToAggregate.length > 0
+      ? requestedRangesToAggregate
+      : TIME_RANGES.filter(r => r.default)
+    const maxHistoryRangeMs = Math.max(...rangesToAggregate.map(r => r.rangeMs))
+    const historySince = new Date(now.getTime() - maxHistoryRangeMs).toISOString()
+    const uptime24hSince = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
+    const uptime7dSince = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
     for (const monitor of monitors) {
       try {
         console.log(`[dashboard] 处理监控: ${monitor.name}`)
 
-        let allRecords: CheckRecord[] = []
+        let historyRecords: CheckRecord[] = []
+        let latest: CheckRecord | undefined
+        let uptime24h = 0
+        let uptime7d = 0
         try {
-          allRecords = db
-            .prepare("SELECT * FROM check_history WHERE name = ? ORDER BY checked_at DESC")
-            .all(monitor.name) as CheckRecord[]
-          console.log(`[dashboard] ${monitor.name}: 找到 ${allRecords.length} 条记录`)
+          latest = db
+            .prepare("SELECT * FROM check_history WHERE name = ? ORDER BY checked_at DESC LIMIT 1")
+            .get(monitor.name) as CheckRecord | undefined
+          historyRecords = db
+            .prepare("SELECT * FROM check_history WHERE name = ? AND checked_at >= ? ORDER BY checked_at DESC")
+            .all(monitor.name, historySince) as CheckRecord[]
+          const uptime24hCounts = db
+            .prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN status = 'up' THEN 1 ELSE 0 END) AS up FROM check_history WHERE name = ? AND checked_at > ?")
+            .get(monitor.name, uptime24hSince) as { total: number; up: number | null }
+          const uptime7dCounts = db
+            .prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN status = 'up' THEN 1 ELSE 0 END) AS up FROM check_history WHERE name = ? AND checked_at > ?")
+            .get(monitor.name, uptime7dSince) as { total: number; up: number | null }
+          uptime24h = calculateUptimeFromCounts(uptime24hCounts.total, uptime24hCounts.up ?? 0)
+          uptime7d = calculateUptimeFromCounts(uptime7dCounts.total, uptime7dCounts.up ?? 0)
+          console.log(`[dashboard] ${monitor.name}: history=${historyRecords.length}, since=${formatLogTime(historySince)}`)
         } catch (dbError) {
           console.error(`[dashboard] ${monitor.name} 数据库查询失败:`, dbError)
         }
 
-        const latest = allRecords[0]
+        if (!latest && historyRecords.length > 0) {
+          latest = historyRecords[0]
+        }
         console.log(`[dashboard] ${monitor.name}: latest=`, latest ? { status: latest.status, time: formatLogTime(latest.checked_at) } : 'none')
-
-        const records24h = allRecords.filter(
-          (r) => {
-            try {
-              return new Date(r.checked_at) > new Date(now.getTime() - 24 * 60 * 60 * 1000)
-            } catch (e) {
-              return false
-            }
-          }
-        )
-        const records7d = allRecords.filter(
-          (r) => {
-            try {
-              return new Date(r.checked_at) > new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-            } catch (e) {
-              return false
-            }
-          }
-        )
 
         // 聚合各种时间范围的数据
         const history_points: { [key: string]: HistoryPoint[] } = {}
         for (const range of rangesToAggregate) {
-          history_points[range.id] = aggregateRecords(allRecords, range.rangeMs, range.granularityMs, now)
+          history_points[range.id] = aggregateRecords(historyRecords, range.rangeMs, range.granularityMs, now)
         }
 
         result.monitors.push({
@@ -210,8 +204,8 @@ export async function GET(request: NextRequest) {
           url: monitor.url,
           status: latest?.status || "down",
           latency_ms: latest?.latency_ms || null,
-          uptime_24h: calculateUptime(records24h),
-          uptime_7d: calculateUptime(records7d),
+          uptime_24h: uptime24h,
+          uptime_7d: uptime7d,
           last_checked: latest?.checked_at || "",
           last_error: latest?.error || null,
           history_points,
@@ -233,7 +227,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log(`[dashboard] 请求完成，返回 ${result.monitors.length} 个监控`)
+    console.log(`[dashboard] 请求完成，返回 ${result.monitors.length} 个监控，durationMs=${Math.round(performance.now() - requestStartedAt)}`)
     return NextResponse.json(result)
   } catch (error) {
     console.error(`[dashboard] 请求异常:`, error)

@@ -1,7 +1,7 @@
 import cron from "node-cron"
 import { getMonitorsFromEnv, getCheckIntervalSeconds, getHistoryRetentionDays } from "./config"
 import { checkAndSave } from "./checker"
-import { cleanOldHistory } from "./db"
+import { cleanOldHistory, hasCheckRecordInRange } from "./db"
 import { formatDate } from "./utils"
 
 let cronJob: cron.ScheduledTask | null = null
@@ -68,6 +68,25 @@ function startSchedulerHeartbeat(intervalSeconds: number) {
   heartbeatTimer.unref?.()
 }
 
+function alignToBucket(date: Date, intervalSeconds: number): Date {
+  const intervalMs = intervalSeconds * 1000
+  return new Date(Math.floor(date.getTime() / intervalMs) * intervalMs)
+}
+
+function buildCronExpression(intervalSeconds: number): { expression: string; wakeIntervalSeconds: number } {
+  if (intervalSeconds === 60) {
+    return { expression: '*/30 * * * * *', wakeIntervalSeconds: 30 }
+  }
+
+  if (intervalSeconds < 60) {
+    return { expression: `*/${intervalSeconds} * * * * *`, wakeIntervalSeconds: intervalSeconds }
+  }
+
+  const minutes = Math.floor(intervalSeconds / 60)
+  const seconds = intervalSeconds % 60
+  return { expression: `${seconds} */${minutes} * * * *`, wakeIntervalSeconds: intervalSeconds }
+}
+
 export function startCron() {
   if (cronJob) return
 
@@ -76,23 +95,44 @@ export function startCron() {
   const intervalSeconds = getCheckIntervalSeconds()
   const retentionDays = getHistoryRetentionDays()
   const monitors = getMonitorsFromEnv()
+  const { expression: cronExpression, wakeIntervalSeconds } = buildCronExpression(intervalSeconds)
 
   console.log(
-    `[cron] 启动定时任务，间隔 ${intervalSeconds} 秒，保留 ${retentionDays} 天历史 env.NODE_ENV=${process.env.NODE_ENV ?? "-"} env.DB_PATH=${process.env.DB_PATH ?? "-"}`
+    `[cron] 启动定时任务，目标间隔 ${intervalSeconds} 秒，唤醒间隔 ${wakeIntervalSeconds} 秒，保留 ${retentionDays} 天历史 env.NODE_ENV=${process.env.NODE_ENV ?? "-"} env.DB_PATH=${process.env.DB_PATH ?? "-"}`
   )
   console.log(`[cron] 监控目标: ${monitors.map((m) => m.name).join(", ")}`)
-  startSchedulerHeartbeat(intervalSeconds)
+  startSchedulerHeartbeat(wakeIntervalSeconds)
 
   const doCheck = async (trigger = "schedule") => {
+    const triggeredAt = new Date()
+    const bucketStart = alignToBucket(triggeredAt, intervalSeconds)
+    const bucketEnd = new Date(bucketStart.getTime() + intervalSeconds * 1000)
+    const bucketStartIso = bucketStart.toISOString()
+    const bucketEndIso = bucketEnd.toISOString()
+
+    if (activeRuns > 0) {
+      console.warn(
+        `[cron] skip trigger=${trigger} reason=active-run activeRuns=${activeRuns} at=${triggeredAt.toISOString()} bucketStart=${bucketStartIso}`
+      )
+      return
+    }
+
+    if (hasCheckRecordInRange(bucketStartIso, bucketEndIso)) {
+      console.log(
+        `[cron] skip trigger=${trigger} reason=bucket-has-record at=${triggeredAt.toISOString()} bucketStart=${bucketStartIso} bucketEnd=${bucketEndIso}`
+      )
+      return
+    }
+
     const runId = ++runSeq
-    const startedAt = new Date()
+    const startedAt = triggeredAt
     const startedAtMs = startedAt.getTime()
     const previousGapMs = lastRunStartedAt === null ? null : startedAtMs - lastRunStartedAt
     lastRunStartedAt = startedAtMs
     activeRuns += 1
 
     console.log(
-      `[cron] run=${runId} start trigger=${trigger} at=${startedAt.toISOString()} local=${formatDate(startedAt)} previousGapMs=${previousGapMs ?? "-"} activeRuns=${activeRuns} monitorCount=${monitors.length}`
+      `[cron] run=${runId} start trigger=${trigger} at=${startedAt.toISOString()} local=${formatDate(startedAt)} bucketStart=${bucketStartIso} bucketEnd=${bucketEndIso} previousGapMs=${previousGapMs ?? "-"} activeRuns=${activeRuns} monitorCount=${monitors.length}`
     )
 
     if (previousGapMs !== null && previousGapMs > intervalSeconds * 1000 * 1.5) {
@@ -147,20 +187,6 @@ export function startCron() {
   }
 
   doCheck("startup")
-
-  let cronExpression: string
-  if (intervalSeconds === 60) {
-    // 每分钟执行一次，在第 0 秒
-    cronExpression = '0 * * * * *'
-  } else if (intervalSeconds < 60) {
-    // 少于 60 秒，用秒级表达式
-    cronExpression = `*/${intervalSeconds} * * * * *`
-  } else {
-    // 超过 60 秒，转换为分钟和秒
-    const minutes = Math.floor(intervalSeconds / 60)
-    const seconds = intervalSeconds % 60
-    cronExpression = `${seconds} */${minutes} * * * *`
-  }
 
   console.log(`[cron] 使用 cron 表达式: ${cronExpression}`)
   cronJob = cron.schedule(cronExpression, () => doCheck("schedule"))

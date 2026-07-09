@@ -36,6 +36,11 @@ export function getDb() {
       ON check_history(name, checked_at DESC);
   `)
 
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_checked_at
+      ON check_history(checked_at DESC);
+  `)
+
   return db
 }
 
@@ -67,6 +72,20 @@ export function insertCheckRecord(record: Omit<CheckRecord, "id">) {
     record.error,
     record.checked_at
   )
+}
+
+export function hasCheckRecordInRange(startIso: string, endIso: string): boolean {
+  const db = getDb()
+  const row = db
+    .prepare(`
+      SELECT 1
+      FROM check_history
+      WHERE checked_at >= ? AND checked_at < ?
+      LIMIT 1
+    `)
+    .get(startIso, endIso)
+
+  return Boolean(row)
 }
 
 export function cleanOldHistory(days: number) {
