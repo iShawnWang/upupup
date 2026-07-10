@@ -10,7 +10,8 @@
     "start": "HOST=0.0.0.0 PORT=3001 next start",
     "start:worker": "node --env-file=.env dist-worker/worker.js",
     "test": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/*.test.js",
-    "lint": "next lint"
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.1.19",

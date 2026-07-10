@@ -5,17 +5,17 @@ import { Badge } from "@/components/ui/badge"
 import { HistoryGrid } from "./history-grid"
 import { cn } from "@/lib/utils"
 import { useI18n } from "@/lib/i18n/context"
+import type { MonitorData } from "@/app/api/dashboard/route"
 
 const formatLatency = (value: number | null | undefined) =>
   typeof value === "number" ? `${value} ms` : "—"
 
 interface StatusCardProps {
-  monitor: any
-  time_ranges?: any[]
+  monitor: MonitorData
   selectedRangeId: string
 }
 
-export function StatusCard({ monitor, time_ranges = [], selectedRangeId }: StatusCardProps) {
+export function StatusCard({ monitor, selectedRangeId }: StatusCardProps) {
   const { t } = useI18n()
   const isUp = monitor.status === "up"
 
@@ -113,7 +113,6 @@ export function StatusCard({ monitor, time_ranges = [], selectedRangeId }: Statu
       <div className="border-t border-border/40 bg-muted/10 px-5 py-4">
         <HistoryGrid
           history_points={monitor.history_points}
-          time_ranges={time_ranges}
           selectedRangeId={selectedRangeId}
         />
       </div>

@@ -4,7 +4,7 @@
 
 **Goal:** Replace the removed Next.js lint command with ESLint 9 Flat Config and leave the repository lint-clean.
 
-**Architecture:** ESLint runs directly from package scripts. `eslint.config.mjs` composes the installed Next.js Core Web Vitals flat preset with project output ignores.
+**Architecture:** ESLint runs directly from package scripts. `eslint.config.mjs` composes the installed Next.js Core Web Vitals and TypeScript flat presets with project output ignores.
 
 **Tech Stack:** Next.js 16.2.6, ESLint 9.39.4, eslint-config-next 16.2.6, TypeScript 5.9.
 
@@ -26,20 +26,22 @@
 - Produces: `pnpm lint` → `eslint .`
 - Produces: `pnpm lint:fix` → `eslint . --fix`
 
-- [ ] Create `eslint.config.mjs` with the following composition:
+- [x] Create `eslint.config.mjs` with the following composition:
 
 ```js
 import { defineConfig, globalIgnores } from "eslint/config"
 import nextVitals from "eslint-config-next/core-web-vitals"
+import nextTs from "eslint-config-next/typescript"
 
 export default defineConfig([
   ...nextVitals,
+  ...nextTs,
   globalIgnores([".next/**", "out/**", "build/**", "dist-worker/**", ".test-dist/**", "coverage/**"]),
 ])
 ```
 
-- [ ] Replace `next lint` with `eslint .` and add the opt-in `lint:fix` script.
-- [ ] Run `pnpm lint`; inspect every finding before making source changes.
+- [x] Replace `next lint` with `eslint .` and add the opt-in `lint:fix` script.
+- [x] Run `pnpm lint`; inspect every finding before making source changes.
 
 ### Task 2: Resolve Findings and Verify
 
@@ -50,8 +52,8 @@ export default defineConfig([
 - Consumes: the Flat Config and existing application source.
 - Produces: a zero-exit lint command without suppressing rules globally.
 
-- [ ] Fix actionable findings without unrelated refactors or blanket disable comments.
-- [ ] Run `pnpm lint` and require exit code 0.
-- [ ] Run `pnpm test` and require zero failed tests.
-- [ ] Run `pnpm build`, then `pnpm exec tsc --noEmit --incremental false`, sequentially, and require exit code 0.
-- [ ] Run `git diff --check`.
+- [x] Fix actionable findings without unrelated refactors or blanket disable comments.
+- [x] Run `pnpm lint` and require exit code 0.
+- [x] Run `pnpm test` and require zero failed tests.
+- [x] Run `pnpm build`, then `pnpm exec tsc --noEmit --incremental false`, sequentially, and require exit code 0.
+- [x] Run `git diff --check`.

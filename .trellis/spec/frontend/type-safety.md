@@ -36,7 +36,6 @@ The project currently does not use Zod or another runtime schema library. Enviro
 
 ## Known gaps and anti-patterns
 
-- `components/status-card.tsx` uses `monitor: any` and `time_ranges?: any[]`; this is existing technical debt, not a preferred contract.
-- `components/history-grid.tsx` uses `time_ranges?: any[]` even though its actual behavior only needs the selected range map; avoid extending this untyped surface.
+- `StatusCard` reuses `MonitorData`, and `HistoryGrid` reuses `HistoryPoint`; keep component props tied to those shared API contracts.
 - `app/layout.tsx` casts the `x-locale` header to `Locale`; retain the fallback behavior and consider a type guard before adding more locale sources.
 - Do not silence strictness with `as any`, non-null assertions, or broad index signatures when a domain type can express the contract.

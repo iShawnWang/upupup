@@ -18,6 +18,8 @@ components/
   language-toggle.tsx     # Locale client control
   theme-provider.tsx      # next-themes adapter
   ui/                     # shadcn/Radix-style reusable primitives
+hooks/
+  use-hydrated.ts         # Shared SSR/hydration readiness boundary
 lib/
   config.ts               # Environment parsing and defaults
   db.ts                   # SQLite connection/schema/queries
@@ -37,6 +39,7 @@ The structure is demonstrated in `README.md` and matches the import paths used t
 - Put route handlers and route-specific response types in the matching `app/**/route.ts` file. The dashboard contract is defined in `app/api/dashboard/route.ts` and imported by `app/page.tsx` and `components/dashboard-view.tsx`.
 - Put page-level composition and page-owned state in `components/dashboard-view.tsx`, not in the low-level cards.
 - Put reusable visual primitives in `components/ui/`. Existing primitives wrap Radix or native elements and use `cn` for class merging.
+- Put client hooks shared by multiple features in `hooks/`; keep one-off hook logic beside its owning component.
 - Put feature components directly in `components/` while the repository remains small. There are no feature subdirectories or barrel exports today.
 - Put cross-component constants and domain helpers in `lib/` (`lib/time-ranges.ts`, `lib/utils.ts`). Put server-only monitoring and database logic in the same directory, and do not import those modules into a client component.
 - Keep translations in `lib/i18n/` and translation dictionaries in `lib/i18n/*.json`.

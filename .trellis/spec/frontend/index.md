@@ -25,7 +25,7 @@ Before changing frontend code:
 For frontend changes, review [Quality Guidelines](./quality-guidelines.md) and verify:
 
 - The applicable TypeScript check and production build pass.
-- `pnpm lint` is attempted; if it fails because the current `next lint` script or ESLint configuration is missing, record that repository tooling issue explicitly.
+- `pnpm lint` passes with ESLint 9 Flat Config and no warnings or errors.
 - New interactive elements retain semantic markup, keyboard/focus behavior, and accessible labels.
 - New user-facing strings are present in both locale dictionaries.
 - No new `any`, uncleaned timers, client/server boundary violations, or template text are introduced.

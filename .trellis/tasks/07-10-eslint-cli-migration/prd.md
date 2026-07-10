@@ -15,10 +15,10 @@ Replace removed next lint command with ESLint 9 flat config and fix migration-re
 
 ## Acceptance Criteria
 
-- [ ] `pnpm lint` invokes ESLint directly and exits successfully.
-- [ ] `pnpm lint:fix` is available for explicit autofix use.
-- [ ] Generated output is excluded from linting.
-- [ ] Tests, TypeScript checking, and the production build still pass.
+- [x] `pnpm lint` invokes ESLint directly and exits successfully.
+- [x] `pnpm lint:fix` is available for explicit autofix use.
+- [x] Generated output is excluded from linting.
+- [x] Tests, TypeScript checking, and the production build still pass.
 
 ## Notes
 

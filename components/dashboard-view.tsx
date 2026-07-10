@@ -45,7 +45,6 @@ export function DashboardView({ initialData }: { initialData: DashboardResponse 
 
   useEffect(() => {
     let isMounted = true
-    let intervalId: any = null
 
     const fetchData = async () => {
       if (!isMounted) return
@@ -69,13 +68,11 @@ export function DashboardView({ initialData }: { initialData: DashboardResponse 
     }
 
     fetchData()
-    intervalId = setInterval(fetchData, 30000)
+    const intervalId = setInterval(fetchData, 30000)
 
     return () => {
       isMounted = false
-      if (intervalId) {
-        clearInterval(intervalId)
-      }
+      clearInterval(intervalId)
     }
   }, [selectedRangeId])
 
@@ -147,7 +144,6 @@ export function DashboardView({ initialData }: { initialData: DashboardResponse 
           <StatusCard
             key={monitor.name}
             monitor={monitor}
-            time_ranges={data.time_ranges}
             selectedRangeId={selectedRangeId}
           />
         ))}

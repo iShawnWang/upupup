@@ -108,7 +108,7 @@ function aggregateRecords(
   let currentTime = new Date(startTimeAligned)
   while (currentTime < nowAligned) {
     // 聚合该时间段的记录
-    let aggregatedPoint: HistoryPoint = {
+    const aggregatedPoint: HistoryPoint = {
       time: currentTime.toISOString(),
       status: null,
       latency_ms: null,

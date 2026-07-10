@@ -5,9 +5,9 @@ import {
   useContext,
   useState,
   useCallback,
-  useEffect,
   type ReactNode,
 } from "react"
+import { useHydrated } from "@/hooks/use-hydrated"
 import type { Translations, Locale } from "./types"
 import { LOCALES, DEFAULT_LOCALE, LOCALE_LABELS } from "./types"
 import zh from "./zh.json"
@@ -47,13 +47,8 @@ interface I18nContextValue {
 const I18nContext = createContext<I18nContextValue | null>(null)
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setLocaleState(getInitialLocale())
-    setMounted(true)
-  }, [])
+  const [locale, setLocaleState] = useState<Locale>(getInitialLocale)
+  const mounted = useHydrated()
 
   const setLocale = useCallback((newLocale: Locale) => {
     setLocaleState(newLocale)

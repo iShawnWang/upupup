@@ -14,7 +14,7 @@ Use `"use client"` at the top of a component only when it uses client hooks, bro
 ## Props and composition
 
 - Define a named props interface for feature components, as in `StatusCardProps` and `HistoryGridProps`.
-- Pass data down from the page-level owner. `DashboardView` owns `DashboardResponse` state and passes one monitor plus range selection to `StatusCard`; `StatusCard` passes history data to `HistoryGrid`.
+- Pass data down from the page-level owner. `DashboardView` owns `DashboardResponse` state and passes one typed `MonitorData` plus range selection to `StatusCard`; `StatusCard` passes the selected history map to `HistoryGrid`.
 - Use stable domain keys for mapped components. `DashboardView` uses `monitor.name` and `HistoryGrid` currently uses the segment index because the API returns ordered buckets without a bucket id.
 - Keep feature components focused on presentation and interaction. Database queries and monitor execution stay in `app/api/dashboard/route.ts` and `lib/`.
 - Use semantic HTML and explicit button types for interactive elements. `HistoryGrid` renders each segment as `<button type="button">` and supplies an `aria-label`.
@@ -51,6 +51,6 @@ Representative conditional styling from `components/status-card.tsx`:
 ## Avoid
 
 - Do not introduce a global store for state owned by one page or card.
-- Do not silently use `any` for new feature props. Existing `StatusCard` range/monitor props use `any` and are a known typing gap; new code should use the API interfaces or a local typed interface.
+- Do not use `any` for feature props. Reuse API interfaces such as `MonitorData` and `HistoryPoint`, or define a narrow local interface.
 - Do not bypass the shared `cn` helper with ad-hoc class concatenation when classes are conditional.
 - Do not make a low-level UI primitive depend on dashboard data, i18n context, or server modules.

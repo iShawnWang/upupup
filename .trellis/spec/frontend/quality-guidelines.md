@@ -4,10 +4,72 @@
 
 The repository defines these package scripts in `package.json`:
 
-- `pnpm lint` → `next lint`
+- `pnpm lint` → `eslint .`
+- `pnpm lint:fix` → `eslint . --fix` (explicit opt-in only)
+- `pnpm test` → compile TypeScript tests and run the Node test runner
 - `pnpm build` → `next build`
 
-There is no ESLint flat config (`eslint.config.js/mjs/cjs`), no test script, and no test/spec directory in the current repository. For TypeScript changes, also run `pnpm exec tsc --noEmit`. For changes to API, database, monitoring, or deployment behavior, include a successful production build in verification.
+ESLint uses `eslint.config.mjs` with `eslint-config-next/core-web-vitals`. Generated Next.js, worker, test, coverage, and build output is ignored. For TypeScript changes, also run `pnpm exec tsc --noEmit`. For changes to API, database, monitoring, or deployment behavior, include a successful production build in verification.
+
+## Scenario: ESLint CLI contract
+
+### 1. Scope / Trigger
+
+Read this contract when changing package lint scripts, ESLint presets, generated-output ignores, React hook lint fixes, or CI quality commands. Next.js 16 removed `next lint`; do not restore it.
+
+### 2. Signatures
+
+```text
+pnpm lint      -> eslint .
+pnpm lint:fix  -> eslint . --fix
+```
+
+`eslint.config.mjs` composes `eslint-config-next/core-web-vitals`, `eslint-config-next/typescript`, and project-level global ignores. Next.js documents the TypeScript preset as an additional rule set used alongside Core Web Vitals.
+
+### 3. Contracts
+
+- `pnpm lint` is read-only and must exit `0` with no errors.
+- `pnpm lint:fix` may modify files and is run only when explicitly requested.
+- Generated directories `.next`, `out`, `build`, `dist-worker`, `.test-dist`, and `coverage` are excluded.
+- Do not disable a lint rule globally to hide an actionable source finding.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|-----------|-------------------|
+| ESLint reports a source error | Inspect and make the smallest behavior-preserving source fix. |
+| Finding is in generated output | Add the generated directory to global ignores, not an inline suppression. |
+| React flags synchronous state in an Effect | Prefer deriving state or a hydration-safe external-store boundary. |
+| Autofix would touch unrelated files | Do not run `lint:fix`; edit the specific finding manually. |
+
+### 5. Good / Base / Bad Cases
+
+- Good: shared hydration detection uses `useHydrated()` and passes the React hooks preset.
+- Base: `pnpm lint` checks the repository and exits without changing files.
+- Bad: `next lint` treats `lint` as a project directory on Next.js 16 and fails before checking source.
+
+### 6. Tests Required
+
+- Run `pnpm lint` after config or React hook changes and assert exit code `0`.
+- Run `pnpm test` after source changes.
+- Run `pnpm build`, then `pnpm exec tsc --noEmit --incremental false` sequentially.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```json
+{ "lint": "next lint" }
+```
+
+#### Correct
+
+```json
+{
+  "lint": "eslint .",
+  "lint:fix": "eslint . --fix"
+}
+```
 
 If a project command is unavailable or fails because of the installed framework version, report the exact command and error rather than claiming it passed.
 
@@ -34,5 +96,5 @@ If a project command is unavailable or fails because of the installed framework 
 
 ## Current limitations
 
-- Automated unit, integration, and accessibility tests are not present. Manual verification should cover initial loading, empty/error API data, range switching, 30-second refresh cleanup, locale switching, theme switching, and keyboard access to controls.
+- Automated coverage currently contains a scheduler/database regression test only; frontend integration and accessibility tests are not present. Manual verification should cover initial loading, empty/error API data, range switching, 30-second refresh cleanup, locale switching, theme switching, and keyboard access to controls.
 - Do not add generic test instructions to a change report; add a test only when the repository gains a test runner and a stable test pattern.

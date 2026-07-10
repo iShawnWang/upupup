@@ -6,7 +6,7 @@ Use React state for state that belongs to one page or control:
 
 - `app/page.tsx` owns the initial `data` and `loading` state.
 - `components/dashboard-view.tsx` owns the current `DashboardResponse` and `selectedRangeId`.
-- `components/theme-toggle.tsx` owns only its hydration `mounted` flag.
+- `components/theme-toggle.tsx` derives hydration readiness from the shared `useHydrated()` hook rather than local state.
 
 Derive values with `useMemo` only when the existing pattern benefits from it; `DashboardView` derives the up/down/total summary from `data.monitors`.
 

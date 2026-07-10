@@ -2,14 +2,15 @@
 
 ## Current hook model
 
-There is no `hooks/` directory and no custom data-fetching hook in the current codebase. Hooks are kept close to the component that owns the behavior:
+Shared hooks live in the root `hooks/` directory; feature-specific effects remain close to the component that owns the behavior:
 
 - `app/page.tsx` performs the initial dashboard fetch.
 - `components/dashboard-view.tsx` owns selected-range persistence, dashboard refresh, and summary derivation.
-- `components/theme-toggle.tsx` uses `useTheme` plus a mounted guard.
+- `hooks/use-hydrated.ts` owns the shared hydration boundary used by theme and i18n code.
+- `components/theme-toggle.tsx` uses `useTheme` plus `useHydrated()`.
 - `lib/i18n/context.tsx` owns the `I18nProvider` and exposes the `useI18n` context hook.
 
-If reusable hook logic is added, follow the existing `useXxx` naming convention and place it in a root `hooks/` directory (the configured shadcn alias is `@/hooks`) only when it is shared by multiple features. Do not create a hook wrapper for a single call site without a clear reuse boundary.
+Reusable hook logic follows the `useXxx` naming convention and belongs in the root `hooks/` directory (the configured shadcn alias is `@/hooks`) only when shared by multiple features. Do not create a hook wrapper for a single call site without a clear reuse boundary.
 
 ## Effects and cleanup
 
@@ -18,6 +19,7 @@ If reusable hook logic is added, follow the existing `useXxx` naming convention 
 - Always clear timers in the effect cleanup. `DashboardView` calls `clearInterval(intervalId)` when the component unmounts or the selected range changes; `lib/checker.ts` clears its request timeout in `finally`.
 - Do not start polling or timers during render. Start them in `useEffect` or in the server scheduler lifecycle.
 - Keep browser-only APIs (`window`, `localStorage`, `document`, `navigator`) inside client components/effects or guarded code paths. `DashboardView` checks `typeof window` during initial state setup.
+- Use `useHydrated()` when browser-only rendering must remain hidden through server render and initial hydration. Do not create a mounted flag by synchronously calling `setState` in an empty Effect.
 
 ## Fetching pattern
 
@@ -47,4 +49,4 @@ Context providers should expose a typed value and a hook that fails clearly outs
 - Do not use `setInterval` without cleanup or create one interval per rendered card.
 - Do not read `localStorage` or cookies in a server component.
 - Do not add an abstraction that hides request errors; current code logs errors and renders the existing loading/error states.
-- Do not use `any` for timer ids in new code. `DashboardView` currently uses `any` for `intervalId`; treat it as legacy cleanup work rather than a pattern to copy.
+- Keep timer ids inferred from `setInterval` or use `ReturnType<typeof setInterval>` when a nullable declaration is required.

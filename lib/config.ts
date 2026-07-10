@@ -20,7 +20,7 @@ export function getMonitorsFromEnv(): MonitorConfig[] {
       expectedStatus: m.expectedStatus || 200,
       timeout: m.timeout || 30000,
     }))
-  } catch (e) {
+  } catch {
     throw new Error("MONITORS 环境变量 JSON 解析失败")
   }
 }

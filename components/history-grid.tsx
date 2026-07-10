@@ -1,6 +1,6 @@
 "use client"
 
-import { HistoryPoint } from "@/app/api/dashboard/route"
+import type { HistoryPoint } from "@/app/api/dashboard/route"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
@@ -10,7 +10,6 @@ interface HistoryGridProps {
   history_points: {
     [rangeId: string]: HistoryPoint[]
   }
-  time_ranges?: any[]
   selectedRangeId: string
 }
 
@@ -26,7 +25,7 @@ function formatTime(dateStr: string, locale: string) {
   return date.toLocaleString(lang)
 }
 
-export function HistoryGrid({ history_points, time_ranges = [], selectedRangeId }: HistoryGridProps) {
+export function HistoryGrid({ history_points, selectedRangeId }: HistoryGridProps) {
   const { t, locale } = useI18n()
   const segments = history_points[selectedRangeId] || []
 
