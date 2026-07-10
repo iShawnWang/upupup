@@ -12,6 +12,8 @@
 
 # production
 /build
+/dist-worker
+/.test-dist
 
 # misc
 .DS_Store

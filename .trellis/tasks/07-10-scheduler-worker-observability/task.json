@@ -3,7 +3,7 @@
   "name": "scheduler-worker-observability",
   "title": "Separate scheduler worker and observability",
   "description": "Run cron in a dedicated worker, deduplicate checks per monitor and time bucket, and log every SQL duration plus event-loop delay.",
-  "status": "planning",
+  "status": "in_progress",
   "dev_type": null,
   "scope": null,
   "package": null,

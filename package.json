@@ -4,8 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "HOST=0.0.0.0 PORT=3001 next dev",
-    "build": "next build",
+    "dev:worker": "pnpm build:worker && node --env-file=.env dist-worker/worker.js",
+    "build": "next build && pnpm build:worker",
+    "build:worker": "rm -rf dist-worker && tsc -p tsconfig.worker.json",
     "start": "HOST=0.0.0.0 PORT=3001 next start",
+    "start:worker": "node --env-file=.env dist-worker/worker.js",
+    "test": "rm -rf .test-dist && tsc -p tsconfig.test.json && node --test .test-dist/tests/*.test.js",
     "lint": "next lint"
   },
   "dependencies": {

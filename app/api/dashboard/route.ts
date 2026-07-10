@@ -1,5 +1,10 @@
 import { NextResponse, NextRequest } from "next/server"
-import { getDb, CheckRecord } from "@/lib/db"
+import {
+  CheckRecord,
+  getCheckRecordsSince,
+  getLatestCheckRecord,
+  getUptimeCounts,
+} from "@/lib/db"
 import { getMonitorsFromEnv } from "@/lib/config"
 import { formatDate } from "@/lib/utils"
 import { TIME_RANGES } from "@/lib/time-ranges"
@@ -136,7 +141,6 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const requestedRanges = searchParams.getAll('range')
 
-    const db = getDb()
     const monitors = getMonitorsFromEnv()
     const now = new Date()
 
@@ -169,18 +173,10 @@ export async function GET(request: NextRequest) {
         let uptime24h = 0
         let uptime7d = 0
         try {
-          latest = db
-            .prepare("SELECT * FROM check_history WHERE name = ? ORDER BY checked_at DESC LIMIT 1")
-            .get(monitor.name) as CheckRecord | undefined
-          historyRecords = db
-            .prepare("SELECT * FROM check_history WHERE name = ? AND checked_at >= ? ORDER BY checked_at DESC")
-            .all(monitor.name, historySince) as CheckRecord[]
-          const uptime24hCounts = db
-            .prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN status = 'up' THEN 1 ELSE 0 END) AS up FROM check_history WHERE name = ? AND checked_at > ?")
-            .get(monitor.name, uptime24hSince) as { total: number; up: number | null }
-          const uptime7dCounts = db
-            .prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN status = 'up' THEN 1 ELSE 0 END) AS up FROM check_history WHERE name = ? AND checked_at > ?")
-            .get(monitor.name, uptime7dSince) as { total: number; up: number | null }
+          latest = getLatestCheckRecord(monitor.name)
+          historyRecords = getCheckRecordsSince(monitor.name, historySince)
+          const uptime24hCounts = getUptimeCounts(monitor.name, uptime24hSince)
+          const uptime7dCounts = getUptimeCounts(monitor.name, uptime7dSince)
           uptime24h = calculateUptimeFromCounts(uptime24hCounts.total, uptime24hCounts.up ?? 0)
           uptime7d = calculateUptimeFromCounts(uptime7dCounts.total, uptime7dCounts.up ?? 0)
           console.log(`[dashboard] ${monitor.name}: history=${historyRecords.length}, since=${formatLogTime(historySince)}`)

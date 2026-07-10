@@ -1,14 +1,30 @@
 version: '3.8'
 
 services:
-  upupup:
-    build: .
-    container_name: upupup
+  upupup-web:
+    build:
+      context: .
+      target: runner
+    container_name: upupup-web
     ports:
       - "3001:3001"
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
     volumes:
       - ./data:/app/data
-      - ./.env:/app/.env:ro
+    restart: unless-stopped
+
+  upupup-worker:
+    build:
+      context: .
+      target: worker
+    container_name: upupup-worker
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./data:/app/data
     restart: unless-stopped

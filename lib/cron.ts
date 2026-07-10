@@ -1,11 +1,15 @@
 import cron from "node-cron"
-import { getMonitorsFromEnv, getCheckIntervalSeconds, getHistoryRetentionDays } from "./config"
+import {
+  getMonitorsFromEnv,
+  getCheckIntervalSeconds,
+  getHistoryRetentionDays,
+  type MonitorConfig,
+} from "./config"
 import { checkAndSave } from "./checker"
-import { cleanOldHistory, hasCheckRecordInRange } from "./db"
+import { cleanOldHistory, getCheckRecordNamesInRange } from "./db"
 import { formatDate } from "./utils"
 
 let cronJob: cron.ScheduledTask | null = null
-let heartbeatTimer: NodeJS.Timeout | null = null
 let processDiagnosticsRegistered = false
 let activeRuns = 0
 let runSeq = 0
@@ -47,27 +51,6 @@ function registerProcessDiagnostics() {
   })
 }
 
-function startSchedulerHeartbeat(intervalSeconds: number) {
-  if (heartbeatTimer) return
-
-  const heartbeatMs = Math.max(10_000, intervalSeconds * 1000)
-  const warnAfterMs = Math.max(heartbeatMs * 1.5, heartbeatMs + 10_000)
-  let lastHeartbeatAt = Date.now()
-
-  heartbeatTimer = setInterval(() => {
-    const now = Date.now()
-    const gapMs = now - lastHeartbeatAt
-    if (gapMs > warnAfterMs) {
-      console.warn(
-        `[cron] heartbeat-delay gapMs=${gapMs} expectedMs=${heartbeatMs} now=${new Date(now).toISOString()} lastHeartbeatAt=${new Date(lastHeartbeatAt).toISOString()}`
-      )
-    }
-    lastHeartbeatAt = now
-  }, heartbeatMs)
-
-  heartbeatTimer.unref?.()
-}
-
 function alignToBucket(date: Date, intervalSeconds: number): Date {
   const intervalMs = intervalSeconds * 1000
   return new Date(Math.floor(date.getTime() / intervalMs) * intervalMs)
@@ -87,6 +70,17 @@ function buildCronExpression(intervalSeconds: number): { expression: string; wak
   return { expression: `${seconds} */${minutes} * * * *`, wakeIntervalSeconds: intervalSeconds }
 }
 
+export function getMonitorsToCheck(
+  monitors: MonitorConfig[],
+  bucketStartIso: string,
+  bucketEndIso: string
+): MonitorConfig[] {
+  const existingMonitorNames = new Set(
+    getCheckRecordNamesInRange(monitors.map((monitor) => monitor.name), bucketStartIso, bucketEndIso)
+  )
+  return monitors.filter((monitor) => !existingMonitorNames.has(monitor.name))
+}
+
 export function startCron() {
   if (cronJob) return
 
@@ -101,8 +95,6 @@ export function startCron() {
     `[cron] 启动定时任务，目标间隔 ${intervalSeconds} 秒，唤醒间隔 ${wakeIntervalSeconds} 秒，保留 ${retentionDays} 天历史 env.NODE_ENV=${process.env.NODE_ENV ?? "-"} env.DB_PATH=${process.env.DB_PATH ?? "-"}`
   )
   console.log(`[cron] 监控目标: ${monitors.map((m) => m.name).join(", ")}`)
-  startSchedulerHeartbeat(wakeIntervalSeconds)
-
   const doCheck = async (trigger = "schedule") => {
     const triggeredAt = new Date()
     const bucketStart = alignToBucket(triggeredAt, intervalSeconds)
@@ -117,9 +109,11 @@ export function startCron() {
       return
     }
 
-    if (hasCheckRecordInRange(bucketStartIso, bucketEndIso)) {
+    const monitorsToCheck = getMonitorsToCheck(monitors, bucketStartIso, bucketEndIso)
+
+    if (monitorsToCheck.length === 0) {
       console.log(
-        `[cron] skip trigger=${trigger} reason=bucket-has-record at=${triggeredAt.toISOString()} bucketStart=${bucketStartIso} bucketEnd=${bucketEndIso}`
+        `[cron] skip trigger=${trigger} reason=bucket-complete at=${triggeredAt.toISOString()} bucketStart=${bucketStartIso} bucketEnd=${bucketEndIso} monitorCount=${monitors.length}`
       )
       return
     }
@@ -132,7 +126,7 @@ export function startCron() {
     activeRuns += 1
 
     console.log(
-      `[cron] run=${runId} start trigger=${trigger} at=${startedAt.toISOString()} local=${formatDate(startedAt)} bucketStart=${bucketStartIso} bucketEnd=${bucketEndIso} previousGapMs=${previousGapMs ?? "-"} activeRuns=${activeRuns} monitorCount=${monitors.length}`
+      `[cron] run=${runId} start trigger=${trigger} at=${startedAt.toISOString()} local=${formatDate(startedAt)} bucketStart=${bucketStartIso} bucketEnd=${bucketEndIso} previousGapMs=${previousGapMs ?? "-"} activeRuns=${activeRuns} monitorCount=${monitors.length} selectedMonitorCount=${monitorsToCheck.length}`
     )
 
     if (previousGapMs !== null && previousGapMs > intervalSeconds * 1000 * 1.5) {
@@ -147,7 +141,7 @@ export function startCron() {
 
     try {
       const results = await Promise.allSettled(
-        monitors.map(async (monitor) => {
+        monitorsToCheck.map(async (monitor) => {
           try {
             const saved = await checkAndSave(monitor, { runId, trigger })
             console.log(
@@ -196,9 +190,5 @@ export function stopCron() {
   if (cronJob) {
     cronJob.stop()
     cronJob = null
-  }
-  if (heartbeatTimer) {
-    clearInterval(heartbeatTimer)
-    heartbeatTimer = null
   }
 }

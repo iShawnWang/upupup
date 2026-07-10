@@ -19,7 +19,14 @@ COPY . .
 # 构建应用
 RUN pnpm build
 
-# 生产阶段
+# Worker 生产依赖
+FROM base AS production-dependencies
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml* ./
+RUN pnpm install --prod --frozen-lockfile
+
+# Web 生产阶段
 FROM base AS runner
 WORKDIR /app
 
@@ -45,3 +52,21 @@ ENV PORT=3001
 ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "server.js"]
+
+# Worker 生产阶段
+FROM base AS worker
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+COPY --from=production-dependencies --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/dist-worker ./dist-worker
+
+RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
+
+USER nextjs
+
+CMD ["node", "dist-worker/worker.js"]

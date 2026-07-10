@@ -44,7 +44,7 @@
 ## 🚀 快速开始
 
 ### 前置要求
-- Node.js 18+
+- Node.js 20+
 - pnpm（或 npm/yarn）
 
 ### 1. 克隆/下载项目
@@ -91,9 +91,18 @@ HISTORY_RETENTION_DAYS=90
 DB_PATH=./data/monitor.db
 ```
 
-### 4. 启动开发服务
+### 4. 启动 Web 和 Worker
+
+启动 Web 进程：
+
 ```bash
 pnpm dev
+```
+
+另开一个终端启动定时任务 Worker：
+
+```bash
+pnpm dev:worker
 ```
 
 访问 http://localhost:3001 即可查看面板！
@@ -143,7 +152,8 @@ pm2 start ecosystem.config.js
 #### 3. 查看状态和日志
 ```bash
 pm2 status
-pm2 logs upupup
+pm2 logs upupup-web
+pm2 logs upupup-worker
 ```
 
 #### 4. 设置开机自启
@@ -163,15 +173,23 @@ docker-compose up -d --build
 
 #### 使用 docker 命令
 ```bash
-docker build -t upupup .
+docker build --target runner -t upupup-web .
+docker build --target worker -t upupup-worker .
 
 docker run -d \
-  --name upupup \
+  --name upupup-web \
   -p 3001:3001 \
+  --env-file .env \
   -v $(pwd)/data:/app/data \
-  -v $(pwd)/.env:/app/.env:ro \
   --restart unless-stopped \
-  upupup
+  upupup-web
+
+docker run -d \
+  --name upupup-worker \
+  --env-file .env \
+  -v $(pwd)/data:/app/data \
+  --restart unless-stopped \
+  upupup-worker
 ```
 
 数据会持久化在 `./data` 目录下。
@@ -206,9 +224,11 @@ upupup/
 │   ├── checker.ts              # 检测逻辑
 │   ├── cron.ts                 # 定时任务
 │   ├── db.ts                   # 数据库操作
+│   ├── runtime-observability.ts # 事件循环延迟监控
 │   ├── config.ts               # 配置解析
 │   └── utils.ts
-├── instrumentation.ts          # 服务启动钩子
+├── instrumentation.ts          # Web 运行时观测钩子
+├── worker.ts                   # 独立定时任务进程
 ├── ecosystem.config.js         # PM2 配置
 ├── docker-compose.yml
 ├── Dockerfile
@@ -219,7 +239,7 @@ upupup/
 ```
 .env 配置
   ↓
-instrumentation.ts → cron.ts 启动定时任务
+worker.ts → cron.ts 启动定时任务
   ↓
 checker.ts 执行检测 → 写入 SQLite
   ↓

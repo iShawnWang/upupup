@@ -44,7 +44,7 @@ A lightweight website and API uptime monitoring dashboard. All targets are confi
 ## Quick Start
 
 ### Requirements
-- Node.js 18+
+- Node.js 20+
 - pnpm, npm, or yarn
 
 ### 1. Clone or download the project
@@ -92,9 +92,18 @@ HISTORY_RETENTION_DAYS=90
 DB_PATH=./data/monitor.db
 ```
 
-### 4. Start the development server
+### 4. Start the web and worker processes
+
+Start the web process:
+
 ```bash
 pnpm dev
+```
+
+In another terminal, start the scheduler worker:
+
+```bash
+pnpm dev:worker
 ```
 
 Open http://localhost:3001 to view the dashboard.
@@ -144,7 +153,8 @@ Open http://localhost:3001 to view the dashboard.
 #### 3. View status and logs
 ```bash
 pm2 status
-pm2 logs upupup
+pm2 logs upupup-web
+pm2 logs upupup-worker
 ```
 
 #### 4. Enable startup on boot
@@ -164,15 +174,23 @@ docker-compose up -d --build
 
 #### With docker
 ```bash
-docker build -t upupup .
+docker build --target runner -t upupup-web .
+docker build --target worker -t upupup-worker .
 
 docker run -d \
-  --name upupup \
+  --name upupup-web \
   -p 3001:3001 \
+  --env-file .env \
   -v $(pwd)/data:/app/data \
-  -v $(pwd)/.env:/app/.env:ro \
   --restart unless-stopped \
-  upupup
+  upupup-web
+
+docker run -d \
+  --name upupup-worker \
+  --env-file .env \
+  -v $(pwd)/data:/app/data \
+  --restart unless-stopped \
+  upupup-worker
 ```
 
 Data is persisted in the `./data` directory.
@@ -207,9 +225,11 @@ upupup/
 │   ├── checker.ts              # Check execution
 │   ├── cron.ts                 # Scheduled task bootstrap
 │   ├── db.ts                   # Database operations
+│   ├── runtime-observability.ts # Event-loop delay metrics
 │   ├── config.ts               # Configuration parsing
 │   └── utils.ts
-├── instrumentation.ts          # Server startup hook
+├── instrumentation.ts          # Web runtime observability hook
+├── worker.ts                   # Dedicated scheduler process
 ├── ecosystem.config.js         # PM2 configuration
 ├── docker-compose.yml
 ├── Dockerfile
@@ -220,7 +240,7 @@ upupup/
 ```text
 .env configuration
   |
-instrumentation.ts -> cron.ts starts scheduled checks
+worker.ts -> cron.ts starts scheduled checks
   |
 checker.ts executes checks -> writes to SQLite
   |

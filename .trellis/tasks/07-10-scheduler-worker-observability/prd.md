@@ -17,14 +17,14 @@ Run cron in a dedicated worker, deduplicate checks per monitor and time bucket, 
 
 ## Acceptance Criteria
 
-- [ ] The Next.js instrumentation hook does not start the scheduler.
-- [ ] A separately built worker starts and stops the scheduler cleanly on `SIGINT` and `SIGTERM`.
-- [ ] PM2 and Docker Compose start exactly one web process and one worker process.
-- [ ] If only some monitors have records in a bucket, the worker checks only the missing monitors.
-- [ ] SQL logs include a stable query name, operation, duration, status, and row/change count where applicable, without parameter values.
-- [ ] Web and worker logs include periodic event-loop delay summaries and threshold warnings.
-- [ ] Automated regression coverage proves per-monitor bucket selection.
-- [ ] Type checking, tests, and the production build pass.
+- [x] The Next.js instrumentation hook does not start the scheduler.
+- [x] A separately built worker starts and stops the scheduler cleanly on `SIGINT` and `SIGTERM`.
+- [x] PM2 and Docker Compose start exactly one web process and one worker process.
+- [x] If only some monitors have records in a bucket, the worker checks only the missing monitors.
+- [x] SQL logs include a stable query name, operation, duration, status, and row/change count where applicable, without parameter values.
+- [x] Web and worker logs include periodic event-loop delay summaries and threshold warnings.
+- [x] Automated regression coverage proves per-monitor bucket selection.
+- [x] Type checking, tests, and the production build pass.
 
 ## Notes
 
